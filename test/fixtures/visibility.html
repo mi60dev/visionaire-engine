@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Visibility fixture</title>
+  <style>
+    body { margin: 0; font-family: sans-serif; }
+    .case { width: 200px; height: 24px; }
+  </style>
+</head>
+<body>
+  <!-- Normal-flow cases stack from y=0 and end well above the absolute cases below. -->
+  <div id="normal" class="case">plainly visible</div>
+  <div id="dn-self" class="case" style="display: none">display:none on self</div>
+  <div id="dn-ancestor" class="case" style="display: none">
+    <p id="dn-child">child of a display:none ancestor</p>
+  </div>
+  <div id="vh" class="case" style="visibility: hidden">visibility:hidden</div>
+  <div id="zero" style="width: 0; height: 0; overflow: hidden"></div>
+  <div id="op0" class="case" style="opacity: 0">opacity zero</div>
+  <div id="off-left" class="case" style="position: absolute; top: 0; left: -9999px">off-screen to the left</div>
+  <div id="off-down" class="case" style="position: absolute; top: 5000px; left: 0">far below the viewport (scrollable to)</div>
+  <!-- Overlay (80,280)-(280,380) fully covers the button (100,300)-(220,340). -->
+  <button id="covered" style="position: absolute; top: 300px; left: 100px; width: 120px; height: 40px">Click me</button>
+  <div id="overlay" style="position: fixed; top: 280px; left: 80px; width: 200px; height: 100px; background: #222; z-index: 10"></div>
+</body>
+</html>

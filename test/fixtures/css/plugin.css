@@ -1,0 +1,7 @@
+/* plugin.css — cascade.html e2e fixture.
+ * LINE NUMBERS ARE LOAD-BEARING: test/e2e.test.ts asserts the marked lines.
+ */
+.btn { background-color: #6c5ce7; padding: 12px 28px; text-decoration: none; }
+.btn { margin-bottom: 12px; }
+/* line 7 — !important beats theme.css .hero-cta .btn (0,2,0) letter-spacing */
+.btn { letter-spacing: 1px !important; }

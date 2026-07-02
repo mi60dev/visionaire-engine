@@ -1,0 +1,40 @@
+{
+  "name": "visionaire-engine",
+  "version": "0.1.0",
+  "description": "Deterministic rendered-page → LLM context MCP server: which rule, which file, which line — and why it wins.",
+  "type": "module",
+  "bin": {
+    "visionaire-engine": "dist/index.js"
+  },
+  "main": "dist/index.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx src/index.ts",
+    "test": "vitest run",
+    "demo": "tsx scripts/demo.ts"
+  },
+  "keywords": [
+    "mcp",
+    "css",
+    "devtools",
+    "debugging",
+    "wordpress",
+    "llm"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@jridgewell/trace-mapping": "^0.3.31",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "puppeteer-core": "^24.43.1",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.0",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3",
+    "vitest": "^3.2.6"
+  }
+}

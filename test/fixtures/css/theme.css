@@ -1,0 +1,24 @@
+/* theme.css — cascade.html e2e fixture.
+ * LINE NUMBERS ARE LOAD-BEARING: test/e2e.test.ts asserts the marked lines.
+ * Keep each marked rule on its own single line; do not shift lines.
+ */
+body { font-family: sans-serif; margin: 0; }
+.hero-cta { padding: 40px; background-color: #f4f4f4; }
+/* line 10 — margin-bottom WINNER: spec (0,2,0) beats plugin.css .btn (0,1,0) */
+/* line 12 — color loser: the inline style attribute wins */
+/* line 14 — INACTIVE width on inline-level .btn; line 16 — loses to plugin !important */
+.hero-cta .btn { margin-bottom: 24px; }
+
+.hero-cta .btn { color: #eeeeee; }
+
+.hero-cta .btn { width: 100%; }
+
+.hero-cta .btn { letter-spacing: 2px; }
+
+#promo-banner { position: static; z-index: 9999; }
+
+/* @layer probe for the CDP contract smoke test (experimental rule.layers field).
+ * outline-color is used nowhere else, so this does not disturb the verdicts above. */
+@layer fixture {
+  .hero-cta .btn { outline-color: #123456; }
+}

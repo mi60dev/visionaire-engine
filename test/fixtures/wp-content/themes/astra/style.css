@@ -1,0 +1,8 @@
+/*
+Theme Name: Astra (e2e fixture)
+*/
+body { color: #1a1a1a; margin: 0; font-family: sans-serif; }
+.site-title { font-size: 28px; }
+/* Competes with post-88.css .elementor-element-4f2a1c (equal specificity 0,1,0);
+ * post-88.css is linked later in wordpress.html, so it wins on source order. */
+.elementor-widget { margin-bottom: 20px; }
