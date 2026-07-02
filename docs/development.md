@@ -450,6 +450,21 @@ claude mcp add visionaire -- node /absolute/path/to/visionaire-engine/dist/index
 }
 ```
 
+**Gotcha: Claude Code and the Claude desktop app read different configs.**
+On one machine there are two independent MCP registries, and registering in
+one does not make the server appear in the other:
+
+| Config file | Read by | UI that shows it |
+|---|---|---|
+| `~/.claude.json` (`mcpServers` key) | Claude Code sessions (CLI and desktop app) | `claude mcp list` |
+| `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) | The Claude app's own server manager | Settings → "Local MCP servers" panel |
+
+`claude mcp add` writes only the first. If you expect the server in the
+Settings panel, add the same stdio JSON entry to the second file (Edit Config
+button) and **fully restart the app** — the panel reads its config at launch.
+Either registration alone is enough for the server to actually work in its
+respective client; you only need both if you use both.
+
 **During development**, run from source without rebuilding:
 
 ```bash
