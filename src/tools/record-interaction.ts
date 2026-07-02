@@ -27,6 +27,7 @@ import type {
   ToolContext,
   ToolDef,
 } from '../types.js'
+import { sanitizePageText } from '../types.js'
 import { buildTimeline, renderTimeline, shortUrl } from '../engine/timeline.js'
 import { pairAttributes, resolveTarget } from '../uid.js'
 
@@ -171,8 +172,9 @@ function classDiff(oldValue: string, newValue: string): string {
 }
 
 function truncate(text: string, max: number): string {
-  const clean = text.replace(/\s+/g, ' ').trim()
-  return clean.length > max ? `${clean.slice(0, max - 1)}…` : clean
+  // Timeline strings quote page data (attribute values, class names, text) —
+  // route through the untrusted-page sanitizer, which also single-lines and caps.
+  return sanitizePageText(text, max)
 }
 
 function frameFunctionName(description: string | undefined): string | undefined {

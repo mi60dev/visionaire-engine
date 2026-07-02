@@ -90,7 +90,13 @@ export class SessionManager {
         )
       }
       // null viewport: keep the real window size of the browser we attach to.
-      browser = await puppeteer.connect({ browserURL: opts.browserUrl, defaultViewport: null })
+      // protocolTimeout: a CDP call that never resolves must error fast, not hang
+      // the tool call (field report: 4-minute client-side MCP timeouts).
+      browser = await puppeteer.connect({
+        browserURL: opts.browserUrl,
+        defaultViewport: null,
+        protocolTimeout: 30_000,
+      })
     } else {
       const executablePath = findChromeExecutable()
       if (!executablePath) {
@@ -103,6 +109,7 @@ export class SessionManager {
         executablePath,
         headless: opts.headless ?? false,
         defaultViewport: { width, height },
+        protocolTimeout: 30_000,
         // We own SIGINT/SIGTERM in index.ts; puppeteer's handlers call process.exit
         // before the MCP transport can shut down cleanly.
         handleSIGINT: false,
@@ -140,6 +147,16 @@ export class SessionManager {
       await enableDebugger(cdp)
       await cdp.send('DOMSnapshot.enable')
       await cdp.send('Overlay.enable')
+
+      // A page-side alert()/confirm()/prompt() blocks every evaluate-family CDP
+      // call indefinitely — auto-dismiss so tools can never dead-lock on a dialog.
+      // beforeunload is accepted (allows navigation to proceed).
+      cdp.on('Page.javascriptDialogOpening', (ev: Protocol.Page.JavascriptDialogOpeningEvent) => {
+        void cdp
+          .send('Page.handleJavaScriptDialog', { accept: ev.type === 'beforeunload' })
+          .catch(() => {})
+        console.error(`[visionaire] auto-dismissed page dialog (${ev.type}): ${ev.message.slice(0, 80)}`)
+      })
 
       cdp.on('Page.frameNavigated', (event: Protocol.Page.FrameNavigatedEvent) => {
         // Main frame only (no parentId). backendNodeIds and styleSheetIds are per-document.

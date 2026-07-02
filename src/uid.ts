@@ -4,6 +4,23 @@
  */
 import type { Protocol } from 'puppeteer-core'
 import type { ResolvedNode, TargetSpec, ToolContext, UidEntry, UidRegistryLike } from './types.js'
+import { sanitizePageText } from './types.js'
+
+/**
+ * The registry is the choke point where page-derived strings enter tool output —
+ * sanitize here (untrusted pages can carry instruction-shaped text in element
+ * text, class names, and ids aimed at the calling LLM).
+ */
+function sanitizeMeta(
+  meta: Partial<Omit<UidEntry, 'uid' | 'backendNodeId'>>,
+): Partial<Omit<UidEntry, 'uid' | 'backendNodeId'>> {
+  const out: Partial<Omit<UidEntry, 'uid' | 'backendNodeId'>> = {}
+  if (meta.tag !== undefined) out.tag = sanitizePageText(meta.tag, 60)
+  if (meta.attrId !== undefined) out.attrId = sanitizePageText(meta.attrId, 60)
+  if (meta.classes !== undefined) out.classes = meta.classes.map((c) => sanitizePageText(c, 60))
+  if (meta.textPreview !== undefined) out.textPreview = sanitizePageText(meta.textPreview, 40)
+  return out
+}
 
 export class UidRegistry implements UidRegistryLike {
   private byUid = new Map<string, UidEntry>()
@@ -11,15 +28,16 @@ export class UidRegistry implements UidRegistryLike {
   private counter = 0
 
   assign(backendNodeId: number, meta: Partial<Omit<UidEntry, 'uid' | 'backendNodeId'>> = {}): string {
+    const clean = sanitizeMeta(meta)
     const existing = this.byBackend.get(backendNodeId)
     if (existing) {
       const entry = this.byUid.get(existing)!
-      Object.assign(entry, meta)
+      Object.assign(entry, clean)
       return existing
     }
     const uid = `e${++this.counter}`
     this.byBackend.set(backendNodeId, uid)
-    this.byUid.set(uid, { uid, backendNodeId, ...meta })
+    this.byUid.set(uid, { uid, backendNodeId, ...clean })
     return uid
   }
 

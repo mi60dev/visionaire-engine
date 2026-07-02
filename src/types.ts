@@ -365,6 +365,20 @@ export function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4)
 }
 
+/**
+ * Sanitize page-derived text before it enters tool output. Pages are untrusted:
+ * element text/attributes can carry instruction-shaped strings aimed at the
+ * calling LLM. Collapse to one line, strip control + bidi-override characters,
+ * and cap the length — a quoted fragment can't become a formatted "system message".
+ */
+export function sanitizePageText(s: string, max = 80): string {
+  const cleaned = s
+    .replace(/[ --‎‏‪-‮⁦-⁩]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return cleaned.length > max ? `${cleaned.slice(0, max - 1)}…` : cleaned
+}
+
 // ───────────────────────── Time dimension (SPEC §14) ─────────────────────────
 
 export interface ScriptInfo {

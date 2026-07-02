@@ -68,13 +68,57 @@ function errorResult(err: unknown): CallToolResult {
   return { content: [{ type: 'text', text: `Error: ${message}` }], isError: true }
 }
 
+/** Watchdog: a wedged tool call must fail fast with an actionable message, never hang the MCP client (field report: 4-minute client timeouts). */
+const TOOL_TIMEOUT_MS = Math.max(5_000, Number(process.env['VISIONAIRE_TOOL_TIMEOUT_MS']) || 60_000)
+
+export async function withWatchdog<T>(name: string, run: () => Promise<T>, timeoutMs = TOOL_TIMEOUT_MS): Promise<T> {
+  let timer: NodeJS.Timeout | undefined
+  try {
+    return await Promise.race([
+      run(),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () =>
+            reject(
+              new Error(
+                `${name} did not respond within ${Math.round(timeoutMs / 1000)}s — the browser/page may be wedged. ` +
+                  'Run connect again to reset the session (VISIONAIRE_TOOL_TIMEOUT_MS overrides this limit).',
+              ),
+            ),
+          timeoutMs,
+        )
+      }),
+    ])
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+/** Tools with legitimate long waits get their declared budget + slack instead of the default. */
+function timeoutBudgetMs(name: string, args: Record<string, unknown>): number {
+  const num = (v: unknown, fallback: number): number => (typeof v === 'number' && Number.isFinite(v) ? v : fallback)
+  if (name === 'pick_element') {
+    const waitS = Math.min(600, Math.max(5, num(args.timeoutSeconds, 60)))
+    return waitS * 1000 + 15_000
+  }
+  if (name === 'record_interaction') {
+    const waitMs = Math.min(10_000, Math.max(200, num(args.waitMs, 1500)))
+    return Math.max(TOOL_TIMEOUT_MS, waitMs + 45_000)
+  }
+  return TOOL_TIMEOUT_MS
+}
+
 function registerToolDef(server: McpServer, session: SessionManager, def: ToolDef): void {
   server.registerTool(
     def.name,
     { description: DESCRIPTIONS[def.name] ?? def.description, inputSchema: def.inputSchema },
     async (args: Record<string, unknown>): Promise<CallToolResult> => {
       try {
-        const result = await def.handler(session.context(), args ?? {})
+        const result = await withWatchdog(
+          def.name,
+          () => def.handler(session.context(), args ?? {}),
+          timeoutBudgetMs(def.name, args ?? {}),
+        )
         return toCallToolResult(result)
       } catch (err) {
         return errorResult(err)

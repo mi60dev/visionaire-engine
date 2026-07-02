@@ -4,7 +4,7 @@
 
 An MCP server that gives LLMs deterministic "rendering truth" about live web pages, so they can debug CSS, design, and WordPress issues instead of guessing from screenshots.
 
-**Status: v0.3.** 16 tools, 171 tests (121 unit + 50 end-to-end on real Chrome) plus a 23-case seeded-bug benchmark (`npm run bench`), verified live against wordpress.org. New in v0.3: the time dimension — event-listener attribution, animation diagnosis, and source-attributed interaction timelines.
+**Status: v0.3.** 16 tools, 182 tests (129 unit + 53 end-to-end on real Chrome) plus a 23-case seeded-bug benchmark (`npm run bench`), verified live against wordpress.org. New in v0.3: the time dimension — event-listener attribution, animation diagnosis, and source-attributed interaction timelines. Hardened for untrusted pages (prompt-injection sanitization, fail-fast watchdog, dialog auto-dismiss).
 
 ## The problem
 
@@ -92,6 +92,16 @@ Full reference: [docs/tools.md](docs/tools.md)
 3. **Complement the incumbent browser MCPs** (same uid idiom), don't compete.
 4. **Honesty ladder** on every attribution: `line > file > db-entity > component > generated > unknown`.
 5. **Token-budgeted output** — a dossier is 300–800 tokens, never a dump.
+
+## Security posture
+
+Visionaire is pointed at arbitrary, untrusted pages, so it treats page content as hostile:
+
+- **Prompt-injection defense.** Page-derived strings (element text, class names, ids, attribute values) are sanitized at the single choke point where they enter tool output — collapsed to one line, stripped of control and bidirectional-override characters, and length-capped. A page cannot smuggle instruction-shaped text formatted as a "system message" toward the calling LLM; such content can only appear as an inert, quoted, truncated fragment.
+- **Fail-fast, never hang.** Every tool call is wrapped in a watchdog (default 60s, `VISIONAIRE_TOOL_TIMEOUT_MS` to override; `pick_element`/`record_interaction` get their declared wait plus slack). A wedged browser returns an actionable error telling you to `connect` again, instead of blocking the client.
+- **No dead-locking dialogs.** Page `alert()`/`confirm()`/`prompt()` calls are auto-dismissed — otherwise they would block every evaluate-family CDP call indefinitely.
+
+Visionaire never executes page-authored code as instructions; it only reads and attributes. The calling LLM should still treat tool output as data about a page, not as commands.
 
 ## Known limitations
 

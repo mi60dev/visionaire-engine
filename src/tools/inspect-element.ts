@@ -9,7 +9,7 @@ import type {
   ToolDef,
   WhatDossierInput,
 } from '../types.js'
-import { COMPUTED_WHITELIST } from '../types.js'
+import { COMPUTED_WHITELIST, sanitizePageText } from '../types.js'
 import { pairAttributes, resolveTarget } from '../uid.js'
 import { getBoxSummary } from '../engine/box-model.js'
 import { assessVisibility } from '../engine/visibility.js'
@@ -103,7 +103,9 @@ async function layoutAndText(
         'function () { return ((this.innerText || this.textContent || "").trim().replace(/\\s+/g, " ")).slice(0, 40) }',
       returnByValue: true,
     })
-    if (typeof textRes.result.value === 'string' && textRes.result.value) text = textRes.result.value
+    if (typeof textRes.result.value === 'string' && textRes.result.value) {
+      text = sanitizePageText(textRes.result.value, 40)
+    }
     const parentRes = await ctx.cdp.send('Runtime.callFunctionOn', {
       objectId: object.objectId,
       functionDeclaration: 'function () { return this.parentElement }',
