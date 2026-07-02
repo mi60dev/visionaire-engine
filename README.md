@@ -4,7 +4,7 @@
 
 An MCP server that gives LLMs deterministic "rendering truth" about live web pages, so they can debug CSS, design, and WordPress issues instead of guessing from screenshots.
 
-**Status: v0.1 — working MVP.** 12 tools, 112 tests (94 unit + 18 end-to-end on real Chrome), verified live against wordpress.org.
+**Status: v0.2.** 13 tools, 125 tests (102 unit + 23 end-to-end on real Chrome) plus a 20-case seeded-bug benchmark (`npm run bench`), verified live against wordpress.org.
 
 ## The problem
 
@@ -56,7 +56,7 @@ npm run demo                                              # bundled fixture
 npm run demo -- https://wordpress.org --selector "a.wp-block-button__link"
 ```
 
-## The 12 tools
+## The 13 tools
 
 | Tool | Purpose |
 |---|---|
@@ -68,6 +68,7 @@ npm run demo -- https://wordpress.org --selector "a.wp-block-button__link"
 | `inspect_ancestors` | Constraint-chain walk: which ancestor constrains width/overflow/stacking |
 | `find_elements` | Deterministic search by text, selector, role, or screen region |
 | `node_at_point` | x,y → element uid + ancestor chain |
+| `pick_element` | Human-in-the-loop grounding: DevTools-style hover highlight, the user clicks the element that looks wrong |
 | `annotated_screenshot` | Screenshot with numbered marks that equal snapshot uids |
 | `style_diff` | Record styles, compare later — verify-my-fix loops |
 

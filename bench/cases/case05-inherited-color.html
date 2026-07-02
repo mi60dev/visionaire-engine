@@ -1,0 +1,17 @@
+<!doctype html>
+<!-- SEEDED BUG: inherited color surprise — .fine-print has no color rule of its
+     own; it inherits red from the .promo wrapper (case05.css:7), which beats the
+     body color (case05.css:9) on inherited proximity. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Bench case 05 — inherited color surprise</title>
+  <link rel="stylesheet" href="css/case05.css">
+</head>
+<body>
+  <div class="promo">
+    <h2>Summer sale — 40% off</h2>
+    <p class="fine-print">Terms apply. Offer ends June 30.</p>
+  </div>
+</body>
+</html>

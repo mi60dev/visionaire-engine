@@ -1,0 +1,17 @@
+<!doctype html>
+<!-- SEEDED BUG: !important war — the plugin's `.alert { background-color: #c92a2a
+     !important }` (case03-plugin.css:7) beats the user's later, higher-specificity
+     `#alerts .alert { background-color: #eef6ff }` (case03-user.css:7). -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Bench case 03 — !important war</title>
+  <link rel="stylesheet" href="css/case03-plugin.css">
+  <link rel="stylesheet" href="css/case03-user.css">
+</head>
+<body>
+  <div id="alerts">
+    <div class="alert">Maintenance scheduled for Sunday.</div>
+  </div>
+</body>
+</html>

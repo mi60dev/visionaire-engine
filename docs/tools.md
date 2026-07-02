@@ -1,6 +1,6 @@
 # Tool reference
 
-Visionaire Engine exposes 12 MCP tools: three session tools (`connect`, `navigate`, `set_viewport`) and nine inspection tools. All output is plain text (plus one PNG for `annotated_screenshot`), deterministic, and token-budgeted. Concepts and vocabulary come from [../SPEC.md](../SPEC.md); this page documents the tools as implemented.
+Visionaire Engine exposes 13 MCP tools: three session tools (`connect`, `navigate`, `set_viewport`) and ten inspection tools. All output is plain text (plus one PNG for `annotated_screenshot`), deterministic, and token-budgeted. Concepts and vocabulary come from [../SPEC.md](../SPEC.md); this page documents the tools as implemented.
 
 ## Targeting elements
 
@@ -121,7 +121,7 @@ e1 body 1280x72 [4 pruned]
 
 - **Iframes** are not descended into; a trailing `[N iframe document(s) not included — v0.1 snapshots the main document only]` marker tells you they exist. Scoping to a node inside an iframe fails with an explicit error.
 
-Note: the census header does not currently include the platform summary — use `page_origins` for WordPress/theme/builder detection.
+When platform detection (the same detection `page_origins` uses) finds something, the census header ends with a platform suffix — `page: https://example.com "Example"  viewport 1280x800  (WordPress 6.9, theme astra, builder elementor)`. Pages with no platform markers get no suffix. For the stylesheet-level breakdown, use `page_origins`.
 
 ## page_origins
 
@@ -265,7 +265,7 @@ why margin-bottom = 30px:
 
 **`spec(a,b,c)`** — the matched selector's specificity: `a` = id selectors, `b` = classes/attributes/pseudo-classes, `c` = type selectors/pseudo-elements. Omitted for inline, attribute, and inherited entries, where specificity is not what decides.
 
-**`→ location`** — where the declaration physically lives, best-honest first: source-mapped authored position (`src/components/hero.scss:42 (via source map)`) > attributed file:line > the served sheet URL trimmed to its last 3 path segments with a leading `…/` > `<inline>` for `<style>` elements > `user-agent stylesheet`. Line numbers are 1-based. When the granularity is `file` (e.g. a source map that exists but failed to resolve) no line number is printed rather than printing a wrong one.
+**`→ location`** — where the declaration physically lives, best-honest first: source-mapped authored position (`src/components/hero.scss:42 (via source map)`) > attributed file:line > the served sheet URL trimmed to its last 3 path segments with a leading `…/` > `<inline>` for `<style>` elements > `user-agent stylesheet`. Line numbers are 1-based. When the granularity is `file` (e.g. a minified sheet with no source map — bracket reads `minified, no map` — or a source map that exists but failed to resolve) no line number is printed rather than printing a wrong one.
 
 **`[granularity | label — edit hint]`** — the honesty-ladder bracket after the location. Granularity is one of `line` > `file` > `db-entity` > `component` > `generated` > `unknown` (see [../SPEC.md](../SPEC.md) §5.2). The label names the origin (`theme: astra`, `plugin: myplugin`, `Elementor (post 88)`, `Customizer > Additional CSS`); the part after `—` is the actionable edit surface (`edit this file`, `Elementor editor for post 88 > widget 4f2a1c`, `generated bundle — re-inspect with bypass query param ?nowprocket`). Label and hint are omitted when they add nothing; a sheet-backed rule that could not be classified still gets a bare `[unknown]` plus its selector and declaration text — never silence.
 
@@ -316,13 +316,13 @@ e7 <html> width:1280px
 ```
 
 ```
-ancestors of e1 <div> — concern: stacking (self → root)
-e1 <div> z-index:9999
+ancestors of e1 <div#promo-banner> — concern: stacking (self → root)
+e1 <div#promo-banner> z-index:9999
 e2 <body> z-index:auto
 e3 <html> z-index:auto root stacking context [BINDING]
 ```
 
-`[BINDING]` marks the nearest qualifying *ancestor* (never the element itself). For `concern: 'stacking'`, when the element has a numeric z-index and its nearest stacking context is not the root, a closing note explains the trap: `note: z-index:9999 is scoped inside context created by e12 (transform) — it cannot escape that context`. Very deep chains are pruned to ~800 tokens, keeping self, the nearest ancestors, and always the root line, with `[N more ancestors pruned]`.
+Identity lines follow the same `<tag#id.classes>` format as the other tools: the `#id` when the element has one, then up to 3 classes. `[BINDING]` marks the nearest qualifying *ancestor* (never the element itself). For `concern: 'stacking'`, when the element has a numeric z-index and its nearest stacking context is not the root, a closing note explains the trap: `note: z-index:9999 is scoped inside context created by e12 (transform) — it cannot escape that context`. Very deep chains are pruned to ~800 tokens, keeping self, the nearest ancestors, and always the root line, with `[N more ancestors pruned]`.
 
 ## find_elements
 
@@ -430,12 +430,42 @@ style diff (slot 'default') for e1 <a.btn>:
 
 Diffs are capped at ~800 tokens with `[N more changes truncated — budget]`.
 
+## pick_element
+
+Human-in-the-loop grounding with zero extra install: turns on a DevTools-style hover highlight in the connected tab (box-model fills plus the element info tooltip, via `Overlay.setInspectMode`) and waits for the user to click the element that looks wrong. The clicked element comes back as a uid with its identity and full ancestor uid chain, ready for `explain_styles` / `inspect_element`. Use it when the user offers to point at the element ("I'll show you", "let me click it") or when verbal grounding (`find_elements`, screenshots, `node_at_point`) failed to pin down the element. It needs a human looking at a visible browser window — `connect { headless: false }` (the default) or attach mode. Inspect mode is always exited when the tool returns, whether picked, timed out, or errored.
+
+| Parameter | Type | Default | Meaning |
+|---|---|---|---|
+| `timeoutSeconds` | number | `60` | How long to wait for the user's click; clamped to 5–600 |
+
+**Output** — real example (cascade fixture, the user clicks the button):
+
+```
+picked: e1 <a.btn> "Get started" 146x42 @(40,142)
+chain: e1 a.btn < e2 section.hero-cta < e3 body
+next: explain_styles { uid: "e1" } or inspect_element { uid: "e1" }
+```
+
+The `picked:` line matches the `node_at_point` identity format (uid, tag/id/classes, own-text preview, size and viewport position); the `chain:` hops each carry a uid so you can move up if the user clicked a text wrapper or an icon inside the thing they meant.
+
+When nobody clicks within the timeout, the tool returns a friendly non-error message so you know to re-ask the user rather than retry blindly:
+
+```
+no element was picked within 60s — is someone looking at the browser window? Ask the user to click the element that looks wrong, then call pick_element again (raise timeoutSeconds if they need more time).
+```
+
+In a headless session the tool still runs (synthetic `Input.dispatchMouseEvent` clicks can pick — that is how it is e2e-tested), but every result is prefixed with a warning line:
+
+```
+warning: headless session — no human can see this tab to click in it (synthetic Input.dispatchMouseEvent clicks still work); use connect { headless: false } for a real picker.
+```
+
 ---
 
 ## Recommended debugging flow
 
 1. **`connect`** — `{ url: "https://site.com" }` to launch, or `{ browserUrl: "http://127.0.0.1:9222" }` to attach to the user's real logged-in Chrome. Add `set_viewport` first thing if the bug is viewport-specific.
-2. **Orient: `page_snapshot`** — get the uid-keyed tree. If the user described an element in words, ground it with **`find_elements`** (`{ text: "Get started" }`); if you are working from a screenshot or a coordinate, use **`annotated_screenshot`** / **`node_at_point`**. On WordPress or an unfamiliar stack, run **`page_origins`** once so you know what you will be attributing against (and whether an optimizer bundle needs bypassing).
+2. **Orient: `page_snapshot`** — get the uid-keyed tree. If the user described an element in words, ground it with **`find_elements`** (`{ text: "Get started" }`); if you are working from a screenshot or a coordinate, use **`annotated_screenshot`** / **`node_at_point`**; if a human is looking at the tab and offers to point, **`pick_element`** lets them click the element directly. On WordPress or an unfamiliar stack, run **`page_origins`** once so you know what you will be attributing against (and whether an optimizer bundle needs bypassing).
 3. **What: `inspect_element`** — confirm the rendered reality: visibility verdict, real box, computed → used pairs. If the element is constrained/clipped/stacked by something above it, **`inspect_ancestors`** with the matching concern names the binding ancestor.
 4. **Why: `explain_styles`** — usually with `property:` once you know what is wrong (`{ uid: "e5", property: "margin-bottom" }`). The WINNER's `→ file:line [granularity | origin — edit hint]` is the edit target; check the notes for INACTIVE declarations and `@media`/`@layer` context before editing.
 5. **Verify: `style_diff`** — `{ uid: "e5", mode: "record" }`, apply the fix, `navigate` to reload (uids go stale, but the slot re-resolves by selector), then `{ mode: "compare" }`. The diff should contain exactly the properties you meant to change — nothing missing, nothing extra.

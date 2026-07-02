@@ -1,0 +1,9 @@
+/* case14.css — seeded bug: a full-viewport fixed cookie overlay never got
+ * dismissed and sits on top of the hero button, swallowing every click.
+ * LINE NUMBERS ARE LOAD-BEARING — bench/manifest.json asserts them:
+ *   line 7  .cookie-overlay { position: fixed; inset: 0; }  the occluder
+ */
+/* line 7 ↓ */
+.cookie-overlay { position: fixed; inset: 0; background-color: rgba(33, 37, 41, 0.5); }
+
+#hero-button { display: inline-block; margin: 60px; padding: 12px 20px; background-color: #f76707; color: #ffffff; }

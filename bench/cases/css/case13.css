@@ -1,0 +1,9 @@
+/* case13.css — seeded bug: the signup button sits inside .mobile-menu, which a
+ * "desktop cleanup" rule set to display:none — the button vanishes everywhere.
+ * LINE NUMBERS ARE LOAD-BEARING — bench/manifest.json asserts them:
+ *   line 7  .mobile-menu { display: none; }  hides the whole subtree
+ */
+/* line 7 ↓ */
+.mobile-menu { display: none; }
+
+#cta { padding: 10px 16px; background-color: #0b7285; color: #ffffff; }

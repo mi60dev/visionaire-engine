@@ -1,0 +1,19 @@
+<!doctype html>
+<!-- SEEDED BUG: source-order override — case02-base.css:10 and case02-skin.css:10
+     both declare `.nav a { color }` at spec (0,1,1); the skin sheet is linked
+     later, so its grey wins purely on source order. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Bench case 02 — source-order override</title>
+  <link rel="stylesheet" href="css/case02-base.css">
+  <link rel="stylesheet" href="css/case02-skin.css">
+</head>
+<body>
+  <nav class="nav">
+    <a href="#">Home</a>
+    <a href="#">Pricing</a>
+    <a href="#">Docs</a>
+  </nav>
+</body>
+</html>

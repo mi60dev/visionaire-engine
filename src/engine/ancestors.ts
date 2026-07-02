@@ -271,12 +271,10 @@ export async function walkAncestors(
       const attrs = pairAttributes(described.attributes)
       const tag = described.nodeName.toLowerCase()
       const classes = (attrs.get('class') ?? '').split(/\s+/).filter(Boolean)
-      const uid = ctx.uids.assign(described.backendNodeId, {
-        tag,
-        classes,
-        attrId: attrs.get('id'),
-      })
+      const attrId = attrs.get('id')
+      const uid = ctx.uids.assign(described.backendNodeId, { tag, classes, attrId })
       const line: AncestorLine = { uid, tag, classes, summary: summarize(concern, f, isRoot) }
+      if (attrId) line.attrId = attrId
       // Binding constraint: nearest qualifying ANCESTOR (never self, i=0).
       if (!bindingAssigned && i > 0 && isBinding(concern, f, isRoot)) {
         line.binding = true

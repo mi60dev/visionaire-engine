@@ -1,0 +1,185 @@
+[
+  {
+    "id": 1,
+    "file": "cases/case01-specificity-override.html",
+    "user_report": "I set the subscribe button's bottom margin to 8px but it still has a huge gap under it.",
+    "target": { "selector": ".btn" },
+    "tool": "explain_styles",
+    "args": { "property": "margin-bottom" },
+    "expected": ["WINNER", "32px", "case01.css:10", "lost (specificity)", "8px", "case01.css:14"]
+  },
+  {
+    "id": 2,
+    "file": "cases/case02-source-order.html",
+    "user_report": "The nav links should be blue per my stylesheet but they render grey.",
+    "target": { "selector": ".nav a" },
+    "tool": "explain_styles",
+    "args": { "property": "color" },
+    "expected": ["WINNER", "#777777", "case02-skin.css:10", "lost (order)", "#0055ff", "case02-base.css:10"]
+  },
+  {
+    "id": 3,
+    "file": "cases/case03-important-war.html",
+    "user_report": "The maintenance alert stays bright red even though I overrode its background with a more specific rule.",
+    "target": { "selector": ".alert" },
+    "tool": "explain_styles",
+    "args": { "property": "background-color" },
+    "expected": ["WINNER", "!important", "case03-plugin.css:7", "lost (importance)", "#eef6ff", "case03-user.css:7"]
+  },
+  {
+    "id": 4,
+    "file": "cases/case04-inline-override.html",
+    "user_report": "The headline should be dark navy per the stylesheet but it renders grey.",
+    "target": { "selector": ".headline" },
+    "tool": "explain_styles",
+    "args": { "property": "color" },
+    "expected": ["inline style attribute", "lost (inline)", "#123a63", "case04.css:7"]
+  },
+  {
+    "id": 5,
+    "file": "cases/case05-inherited-color.html",
+    "user_report": "The fine print under the sale banner is red and I never styled that paragraph at all.",
+    "target": { "selector": ".fine-print" },
+    "tool": "explain_styles",
+    "args": { "property": "color" },
+    "expected": ["WINNER", ".promo", "#b00020", "inherited from", "case05.css:7", "lost (inherited-distance)"]
+  },
+  {
+    "id": 6,
+    "file": "cases/case06-margin-collapse.html",
+    "user_report": "The gap between the intro text and the list is way bigger than the 12px top margin I set on the list.",
+    "target": { "selector": ".intro" },
+    "tool": "explain_styles",
+    "args": { "property": "margin-bottom" },
+    "expected": ["WINNER", "margin-bottom = 48px", "case06.css:10"],
+    "notes": "Collapsed sibling margins: the pass criterion is attributing the 48px margin that actually produces the gap. The engine has no explicit margin-collapse diagnostic (v0.x); if one lands, tighten these markers."
+  },
+  {
+    "id": 7,
+    "file": "cases/case07-contentbox-overflow.html",
+    "user_report": "The promo banner sticks out of its container on the right.",
+    "target": { "selector": ".promo-banner" },
+    "tool": "explain_styles",
+    "args": {},
+    "expected": ["width: 100%", "case07.css:10", "padding-left: 24px", "case07.css:12"]
+  },
+  {
+    "id": 8,
+    "file": "cases/case08-maxwidth-ancestor.html",
+    "user_report": "My chart has width:100% but it never gets wider than about 600px.",
+    "target": { "selector": ".wide-chart" },
+    "tool": "inspect_ancestors",
+    "args": { "concern": "width" },
+    "expected": [".container", "max-width:600px", "[BINDING]"]
+  },
+  {
+    "id": 9,
+    "file": "cases/case09-flex-minwidth.html",
+    "user_report": "The first cell in my flex row refuses to shrink and the row overflows its 480px width.",
+    "target": { "selector": ".cell" },
+    "tool": "inspect_ancestors",
+    "args": { "concern": "width" },
+    "expected": ["min-width", "shrink"],
+    "expected_fail": true,
+    "reason": "The engine has no diagnostic for the implicit min-width:auto of flex items: engine/inactive.ts has no rule for it and engine/ancestors.ts only prints min-width when it differs from 0px/auto, so no output names the shrink blocker."
+  },
+  {
+    "id": 10,
+    "file": "cases/case10-justify-nonflex.html",
+    "user_report": "I put justify-content: space-between on the toolbar but the buttons stay bunched to the left.",
+    "target": { "selector": ".toolbar" },
+    "tool": "explain_styles",
+    "args": { "property": "justify-content" },
+    "expected": ["justify-content: space-between", "INACTIVE", "only affects flex or grid containers", "case10.css:7"]
+  },
+  {
+    "id": 11,
+    "file": "cases/case11-zindex-trapped.html",
+    "user_report": "My tooltip has z-index 9999 but it still slides under the site header.",
+    "target": { "selector": ".tooltip" },
+    "tool": "inspect_ancestors",
+    "args": { "concern": "stacking" },
+    "expected": ["z-index:9999 is scoped inside context created by", "(transform)", "cannot escape"]
+  },
+  {
+    "id": 12,
+    "file": "cases/case12-sticky-no-inset.html",
+    "user_report": "The nav is position:sticky but it just scrolls away with the page instead of sticking.",
+    "target": { "selector": ".site-nav" },
+    "tool": "explain_styles",
+    "args": { "property": "position" },
+    "expected": ["position: sticky", "INACTIVE", "never sticks", "case12.css:7", "top:0"]
+  },
+  {
+    "id": 13,
+    "file": "cases/case13-hidden-ancestor.html",
+    "user_report": "The signup button is not on the page at all.",
+    "target": { "selector": "#cta" },
+    "tool": "inspect_element",
+    "args": {},
+    "expected": ["display-none", "ancestor", ".mobile-menu", "case13.css:7"]
+  },
+  {
+    "id": 14,
+    "file": "cases/case14-occluded-overlay.html",
+    "user_report": "The buy button is visible but clicking it does nothing.",
+    "target": { "selector": "#hero-button" },
+    "tool": "inspect_element",
+    "args": {},
+    "expected": ["occluded by", "<aside>", "probes hit it"]
+  },
+  {
+    "id": 15,
+    "file": "cases/case15-off-viewport.html",
+    "user_report": "The \"New\" badge on the product card never shows up.",
+    "target": { "selector": ".badge" },
+    "tool": "inspect_element",
+    "args": {},
+    "expected": ["off-viewport", "left of the viewport", "not reachable by scrolling"]
+  },
+  {
+    "id": 16,
+    "file": "cases/case16-zero-size.html",
+    "user_report": "The hero section has completely vanished and the content below moved up.",
+    "target": { "selector": ".hero" },
+    "tool": "inspect_element",
+    "args": {},
+    "expected": ["zero-size", "border-box is 1280x0"]
+  },
+  {
+    "id": 17,
+    "file": "cases/case17-invisible-text.html",
+    "user_report": "The saved-changes notice shows up as a green bar with no text in it.",
+    "target": { "selector": ".notice" },
+    "tool": "inspect_element",
+    "args": {},
+    "expected": ["transparent-text", "text color equals background color", "invisible ink"]
+  },
+  {
+    "id": 18,
+    "file": "cases/case18-wp-plugin-override.html",
+    "user_report": "My theme's blue call-to-action button turned red after I installed the popup plugin.",
+    "target": { "selector": ".wp-cta" },
+    "tool": "explain_styles",
+    "args": { "property": "background-color" },
+    "expected": ["WINNER", "plugins/bench-popup/css/popup.css:7", "plugin: bench-popup", "lost (specificity)", "themes/bench-theme/style.css:9", "theme: bench-theme"]
+  },
+  {
+    "id": 19,
+    "file": "cases/case19-wp-customizer.html",
+    "user_report": "Footer links render orange even though the theme stylesheet says they should be blue.",
+    "target": { "selector": ".site-footer a" },
+    "tool": "explain_styles",
+    "args": { "property": "color" },
+    "expected": ["WINNER", "#ff6600", "Customizer > Additional CSS", "db-entity", "lost (order)", "themes/bench-theme/footer.css:7", "#336699"]
+  },
+  {
+    "id": 20,
+    "file": "cases/case20-shorthand-clobber.html",
+    "user_report": "I gave section headings a 24px bottom margin but there is no space under them anymore.",
+    "target": { "selector": ".stack h2" },
+    "tool": "explain_styles",
+    "args": { "property": "margin-bottom" },
+    "expected": ["WINNER", "(from margin)", "case20.css:10", "lost (order)", "24px", "case20.css:7"]
+  }
+]

@@ -1,6 +1,6 @@
 /**
  * MCP server assembly: three session tools owned here (connect / navigate /
- * set_viewport) plus the nine ToolDef tools from src/tools/. SPEC §4, §11.
+ * set_viewport) plus the ten ToolDef tools from src/tools/. SPEC §4, §11.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
@@ -15,6 +15,7 @@ import { inspectElementTool } from './tools/inspect-element.js'
 import { nodeAtPointTool } from './tools/node-at-point.js'
 import { pageOriginsTool } from './tools/page-origins.js'
 import { pageSnapshotTool } from './tools/page-snapshot.js'
+import { pickElementTool } from './tools/pick-element.js'
 import { styleDiffTool } from './tools/style-diff.js'
 
 /** When-to-use descriptions surfaced to the calling LLM; fall back to the ToolDef's own. */
@@ -37,6 +38,8 @@ const DESCRIPTIONS: Record<string, string> = {
     'Capture a screenshot with numbered marks burned in; mark numbers equal snapshot uid numbers (mark 17 = uid e17). Use when you need to see the page and tie pixels back to elements.',
   style_diff:
     "Record an element's styles into a named slot, then compare later and see only the changed properties. Use for verify-my-fix loops: record, apply the change, compare.",
+  pick_element:
+    'Let the human point at the element: turns on a DevTools-style hover highlight in the connected tab and waits for them to click, returning the clicked element\'s uid and ancestor chain. Use when the user says "I\'ll show you" / "let me click it", or when find_elements/screenshot grounding failed to pin down the element. Needs a visible browser window (connect { headless: false }).',
 }
 
 function ok(text: string): CallToolResult {
@@ -150,6 +153,7 @@ export function createServer(session: SessionManager): McpServer {
     nodeAtPointTool,
     annotatedScreenshotTool,
     styleDiffTool,
+    pickElementTool,
   ]
   for (const def of toolDefs) registerToolDef(server, session, def)
 

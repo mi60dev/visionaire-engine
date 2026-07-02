@@ -1,6 +1,6 @@
 {
   "name": "visionaire-engine",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Deterministic rendered-page → LLM context MCP server: which rule, which file, which line — and why it wins.",
   "type": "module",
   "bin": {
@@ -14,6 +14,7 @@
     "build": "tsc -p tsconfig.json",
     "dev": "tsx src/index.ts",
     "test": "vitest run",
+    "bench": "tsx bench/run.ts",
     "demo": "tsx scripts/demo.ts"
   },
   "keywords": [

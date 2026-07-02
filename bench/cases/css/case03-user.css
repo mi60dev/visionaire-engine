@@ -1,0 +1,7 @@
+/* case03-user.css — the site owner's attempted override: higher specificity
+ * AND later in source order, still loses to the plugin's !important.
+ * LINE NUMBERS ARE LOAD-BEARING — bench/manifest.json asserts them:
+ *   line 7  #alerts .alert { background-color: #eef6ff; }  spec (1,1,0) — loses (importance)
+ */
+/* line 7 ↓ */
+#alerts .alert { background-color: #eef6ff; }

@@ -1,0 +1,18 @@
+<!doctype html>
+<!-- SEEDED BUG: z-index trapped in a stacking context — .card's transform
+     (case11.css:9) creates a stacking context, so the tooltip's z-index:9999
+     (case11.css:11) is scoped inside it and paints under the sticky header. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Bench case 11 — z-index trapped in a stacking context</title>
+  <link rel="stylesheet" href="css/case11.css">
+</head>
+<body>
+  <header class="site-header">Site header</header>
+  <div class="card">
+    <div class="tooltip">I should be on top</div>
+    Hover the card for details.
+  </div>
+</body>
+</html>

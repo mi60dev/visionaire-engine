@@ -1,0 +1,20 @@
+<!doctype html>
+<!-- SEEDED BUG (WordPress-flavored): the Customizer's Additional CSS
+     (<style id="wp-custom-css">, printed after the theme sheet) declares
+     `.site-footer a { color: #ff6600 }` at the same specificity as the theme's
+     `.site-footer a { color: #336699 }` (themes/bench-theme/footer.css:7) and
+     wins on source order — footer links turn orange sitewide. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Bench case 19 — Customizer Additional CSS wins</title>
+  <meta name="generator" content="WordPress 6.9">
+  <link rel="stylesheet" id="bench-theme-footer-css" href="wp-content/themes/bench-theme/footer.css">
+  <style id="wp-custom-css">
+    .site-footer a { color: #ff6600; }
+  </style>
+</head>
+<body>
+  <footer class="site-footer"><a href="#">Contact us</a></footer>
+</body>
+</html>

@@ -1,0 +1,13 @@
+/* case11.css — seeded bug: z-index:9999 trapped in a stacking context — .card's
+ * transform creates its own context, so the tooltip can never paint above the
+ * site header no matter how large its z-index is.
+ * LINE NUMBERS ARE LOAD-BEARING — bench/manifest.json asserts them:
+ *   line 9   .card { transform: translate(0, 0); }  the trap
+ *   line 11  .tooltip { position: absolute; z-index: 9999; }
+ */
+body { font-family: sans-serif; margin: 0; }
+.card { transform: translate(0, 0); margin: 24px; padding: 24px; background-color: #f1f3f5; }
+/* line 11 ↓ */
+.tooltip { position: absolute; top: -14px; left: 12px; z-index: 9999; background-color: #212529; color: #ffffff; padding: 6px 10px; }
+
+.site-header { position: sticky; top: 0; z-index: 10; background-color: #343a40; color: #ffffff; padding: 12px; }

@@ -1,7 +1,9 @@
 /**
  * WordPress origin resolver — SPEC §7.3, convention mode, zero WP cooperation.
- * Pure functions over sheet metadata + document markers; no browser required.
+ * Pure functions over sheet metadata + document markers; no browser required
+ * (except detectPlatformFromPage, the one CDP convenience wrapper at the bottom).
  */
+import type { CDPSession } from 'puppeteer-core'
 import type { PlatformInfo, StyleOrigin, WpOrigin, WpOriginKind, WpSheetMeta } from '../types.js'
 
 const ELEMENTOR_WIDGET_SELECTOR = /\.elementor-element-([a-f0-9]+)/
@@ -151,8 +153,8 @@ const KIND_TABLE: Record<WpOriginKind, (wp: WpOrigin, meta: WpSheetMeta) => Omit
     if (file) base.file = file
     return base
   },
+  // No 'child-theme' entry: parent/child is a page-level distinction (detectPlatform only).
   theme: (wp, meta) => themeLike(`theme: ${wp.slug}`, meta),
-  'child-theme': (wp, meta) => themeLike(`child theme: ${wp.slug}`, meta),
   plugin: (wp, meta) => {
     const file = wpContentRelative(meta.sourceURL) ?? urlPath(meta.sourceURL)
     return {
@@ -162,7 +164,6 @@ const KIND_TABLE: Record<WpOriginKind, (wp: WpOrigin, meta: WpSheetMeta) => Omit
       file,
     }
   },
-  unknown: () => ({ granularity: 'unknown', label: 'WordPress (unresolved origin)' }),
 }
 
 export function wpOriginToStyleOrigin(wp: WpOrigin, meta: WpSheetMeta): StyleOrigin {
@@ -246,4 +247,29 @@ export function detectPlatform(
     }
   }
   return info
+}
+
+/** Document markers detectPlatform needs, collected in one Runtime.evaluate. */
+export const DOC_MARKERS_EXPRESSION = `(() => ({
+  generator: Array.from(document.querySelectorAll('meta[name="generator" i]'))
+    .map((m) => m.getAttribute('content') || '').filter(Boolean).join(' | ') || undefined,
+  bodyClasses: document.body ? Array.from(document.body.classList) : [],
+}))()`
+
+/**
+ * detectPlatform against the live page: fetch the document markers with a
+ * single Runtime.evaluate, then run the pure detector over the sheet URLs.
+ * Shared entry point for the census platform header (page_snapshot) and any
+ * other tool that needs page-level platform detection.
+ */
+export async function detectPlatformFromPage(
+  cdp: CDPSession,
+  sheets: Array<{ sourceURL: string }>,
+): Promise<PlatformInfo> {
+  const res = await cdp.send('Runtime.evaluate', {
+    expression: DOC_MARKERS_EXPRESSION,
+    returnByValue: true,
+  })
+  const markers = (res.result.value ?? {}) as { generator?: string; bodyClasses?: string[] }
+  return detectPlatform(sheets, markers)
 }

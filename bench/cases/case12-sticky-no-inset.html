@@ -1,0 +1,14 @@
+<!doctype html>
+<!-- SEEDED BUG: position:sticky without an inset — .site-nav (case12.css:7) has
+     no top/right/bottom/left, so it never sticks and scrolls away with the page. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Bench case 12 — sticky without inset</title>
+  <link rel="stylesheet" href="css/case12.css">
+</head>
+<body>
+  <nav class="site-nav">Products · Pricing · About</nav>
+  <div class="spacer">Long page content…</div>
+</body>
+</html>

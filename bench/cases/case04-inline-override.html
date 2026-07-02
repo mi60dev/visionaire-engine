@@ -1,0 +1,14 @@
+<!doctype html>
+<!-- SEEDED BUG: inline-style override — the headline carries style="color: #8a8a8a"
+     (pasted from an embed snippet), so the stylesheet's `.headline { color: #123a63 }`
+     (case04.css:7) loses to the inline style attribute. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Bench case 04 — inline-style override</title>
+  <link rel="stylesheet" href="css/case04.css">
+</head>
+<body>
+  <h1 class="headline" style="color: #8a8a8a">Quarterly results</h1>
+</body>
+</html>

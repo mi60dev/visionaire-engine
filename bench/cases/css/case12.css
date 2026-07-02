@@ -1,0 +1,9 @@
+/* case12.css — seeded bug: position:sticky with no inset (top/right/bottom/left)
+ * never sticks — the nav just scrolls away with the page.
+ * LINE NUMBERS ARE LOAD-BEARING — bench/manifest.json asserts them:
+ *   line 7  .site-nav { position: sticky; }  INACTIVE (no inset)
+ */
+/* line 7 ↓ */
+.site-nav { position: sticky; background-color: #364fc7; color: #ffffff; padding: 12px; }
+
+.spacer { height: 2000px; }

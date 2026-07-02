@@ -1,0 +1,9 @@
+/*
+Theme Name: Bench Theme (benchmark fixture)
+*/
+/* case 18 — seeded bug: the theme's brand button color loses to a plugin rule.
+ * LINE NUMBERS ARE LOAD-BEARING — bench/manifest.json asserts them:
+ *   line 9  .wp-cta { background-color: #2271b1; }  the theme's intent — loses (specificity)
+ */
+body { font-family: sans-serif; margin: 0; padding: 24px; }
+.wp-cta { background-color: #2271b1; color: #ffffff; padding: 10px 18px; display: inline-block; }

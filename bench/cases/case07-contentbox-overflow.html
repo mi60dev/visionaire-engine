@@ -1,0 +1,17 @@
+<!doctype html>
+<!-- SEEDED BUG: width:100% + padding + content-box — the banner is 100% of the
+     600px wrap PLUS 48px of horizontal padding (case07.css:10 and :12), so its
+     border box is 648px and sticks out of the wrap on the right. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Bench case 07 — content-box overflow</title>
+  <link rel="stylesheet" href="css/case07.css">
+</head>
+<body>
+  <div class="wrap">
+    <div class="promo-banner">Free shipping this week only</div>
+    <p>Regular content stays inside the wrap.</p>
+  </div>
+</body>
+</html>

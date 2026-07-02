@@ -1,0 +1,14 @@
+/* case01.css — seeded bug: specificity override (the intended rule loses).
+ * LINE NUMBERS ARE LOAD-BEARING — bench/manifest.json asserts them:
+ *   line 10  .card .btn { margin-bottom: 32px; }  spec (0,2,0) — WINNER
+ *   line 14  .btn { margin-bottom: 8px; }         the intended fix — loses (specificity)
+ */
+body { font-family: sans-serif; margin: 0; padding: 24px; }
+.card { padding: 24px; background-color: #f6f6f6; }
+.btn { display: inline-block; padding: 10px 16px; background-color: #2f6fed; color: #ffffff; }
+/* line 10 ↓ */
+.card .btn { margin-bottom: 32px; }
+
+
+/* line 14 ↓ */
+.btn { margin-bottom: 8px; }

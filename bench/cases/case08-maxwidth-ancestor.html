@@ -1,0 +1,16 @@
+<!doctype html>
+<!-- SEEDED BUG: max-width binding in an ancestor — .container's max-width:600px
+     (case08.css:10) caps the chart; width:100% on .wide-chart can never exceed it. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Bench case 08 — ancestor max-width binds</title>
+  <link rel="stylesheet" href="css/case08.css">
+</head>
+<body>
+  <div class="container">
+    <div class="wide-chart"></div>
+    <p>The chart above should span the whole page.</p>
+  </div>
+</body>
+</html>

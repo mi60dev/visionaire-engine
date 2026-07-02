@@ -1,0 +1,15 @@
+<!doctype html>
+<!-- SEEDED BUG: occluded by a fixed overlay — the .cookie-overlay <aside>
+     (case14.css:7, position:fixed inset:0) paints on top of #hero-button and
+     swallows every click on it. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Bench case 14 — occluded by a fixed overlay</title>
+  <link rel="stylesheet" href="css/case14.css">
+</head>
+<body>
+  <a id="hero-button" href="#">Buy now</a>
+  <aside class="cookie-overlay"></aside>
+</body>
+</html>

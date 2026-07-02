@@ -1,0 +1,19 @@
+<!doctype html>
+<!-- SEEDED BUG (WordPress-flavored): the theme's `.wp-cta { background-color:
+     #2271b1 }` (themes/bench-theme/style.css:9) loses on specificity to the
+     popup plugin's `.bench-popup .wp-cta { background-color: #d63638 }`
+     (plugins/bench-popup/css/popup.css:7) — the brand button renders red. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Bench case 18 — WP theme rule loses to a plugin rule</title>
+  <meta name="generator" content="WordPress 6.9">
+  <link rel="stylesheet" id="bench-theme-css" href="wp-content/themes/bench-theme/style.css">
+  <link rel="stylesheet" id="bench-popup-css" href="wp-content/plugins/bench-popup/css/popup.css">
+</head>
+<body>
+  <div class="bench-popup">
+    <a class="wp-cta" href="#">Get the deal</a>
+  </div>
+</body>
+</html>

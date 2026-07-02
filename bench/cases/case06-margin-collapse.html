@@ -1,0 +1,19 @@
+<!doctype html>
+<!-- SEEDED BUG: sibling margin collapse — .intro's margin-bottom:48px
+     (case06.css:10) collapses with .list's margin-top:12px (case06.css:12);
+     the rendered gap is 48px however the user tweaks .list's top margin. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Bench case 06 — sibling margin collapse</title>
+  <link rel="stylesheet" href="css/case06.css">
+</head>
+<body>
+  <p class="intro">Everything you need to get started.</p>
+  <ul class="list">
+    <li>Install</li>
+    <li>Configure</li>
+    <li>Ship</li>
+  </ul>
+</body>
+</html>

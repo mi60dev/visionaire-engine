@@ -29,7 +29,7 @@ CDP also means zero site cooperation (no build step, no plugin, no snippet) and 
 │ MCP client │◄────────►│ visionaire-engine (Node, TypeScript, no LLM inside)   │
 │ (Claude    │          │                                                       │
 │  Code,     │          │  index.ts ── stdio transport, shutdown                │
-│  Cursor…)  │          │  server.ts ─ registers 12 tools                       │
+│  Cursor…)  │          │  server.ts ─ registers 13 tools                       │
 └────────────┘          │  session.ts ─ SessionManager ── puppeteer-core ── CDP │
                         │       │            │                                  │
                         │  uid.ts (registry) │  attribution/stylesheets.ts      │
@@ -54,7 +54,7 @@ CDP also means zero site cooperation (no build step, no plugin, no snippet) and 
 
 Extracting everything about every node would be both slow (matched-styles is a per-node CDP call) and useless (a raw dump blows any context window). So extraction is split by cost:
 
-**Pass 1 — census (`page_snapshot`, cheap, whole page).** One `DOMSnapshot.captureSnapshot` call returns the entire flattened DOM plus, per laid-out node, a whitelist of 57 layout-affecting computed properties (`COMPUTED_WHITELIST` in `src/types.ts`), paint order, and geometry — in one round trip. `src/tools/page-snapshot.ts` decodes CDP's columnar format into a nested tree (hierarchy is the strongest structural signal an LLM can get), assigns uids in document order, tags cheap visibility verdicts (`display:none`, `visibility:hidden`, `zero-size`, `off-viewport`) and layout hints (`flex`, `grid`, `sticky z:100`), and hands the tree to the census renderer for budget pruning. Two experimental snapshot params (`includeBlendedBackgroundColors`, `includeTextColorOpacities`) are requested optimistically and retried without on older Chrome.
+**Pass 1 — census (`page_snapshot`, cheap, whole page).** One `DOMSnapshot.captureSnapshot` call returns the entire flattened DOM plus, per laid-out node, a whitelist of 57 layout-affecting computed properties (`COMPUTED_WHITELIST` in `src/types.ts`), paint order, and geometry — in one round trip. `src/tools/page-snapshot.ts` decodes CDP's columnar format into a nested tree (hierarchy is the strongest structural signal an LLM can get), assigns uids in document order, tags cheap visibility verdicts (`display:none`, `visibility:hidden`, `zero-size`, `off-viewport`) and layout hints (`flex`, `grid`, `sticky z:100`), and hands the tree to the census renderer for budget pruning. The census header line carries a platform suffix — `(WordPress 6.9, theme astra, builder elementor)` — when platform detection (`detectPlatform`, the same convention-based detection `page_origins` uses, fed by one extra `Runtime.evaluate` for the generator meta and body classes) finds something; non-platform pages get no suffix. Two experimental snapshot params (`includeBlendedBackgroundColors`, `includeTextColorOpacities`) are requested optimistically and retried without on older Chrome.
 
 **Pass 2 — dossier (deep, per suspect node).** Once the caller has picked a suspect (by uid, selector, or coordinates), the expensive per-node calls run: `CSS.getMatchedStylesForNode` + `CSS.getComputedStyleForNode` feed the cascade engine (`explain_styles`); `DOM.getBoxModel` and the visibility tree feed `inspect_element`; a single in-page `Runtime.callFunctionOn` collects self-to-root computed facts for `inspect_ancestors`. The results flow through the attribution join and out through the dossier renderers.
 
@@ -68,7 +68,7 @@ src/
                   stdout is the MCP protocol; all diagnostics go to stderr.
   server.ts       createServer(session): registers connect / navigate /
                   set_viewport inline (their zod schemas live here) plus the
-                  nine ToolDefs from tools/. Wraps every handler so errors
+                  ten ToolDefs from tools/. Wraps every handler so errors
                   come back as isError text, never a crashed server.
   session.ts      SessionManager: find Chrome (CHROME_PATH or per-OS paths),
                   launch via puppeteer-core or attach to a running browser,
@@ -204,7 +204,7 @@ Every attributed rule carries a granularity label from a fixed ladder — `line 
 | Label | Meaning | Example |
 |---|---|---|
 | `line` | authored file + line known | `themes/astra-child/style.css:104` |
-| `file` | file known, line unreliable | source map present but unresolvable |
+| `file` | file known, line unreliable | minified sheet with no source map; source map present but unresolvable |
 | `db-entity` | origin is a database entity, not a file | `Global Styles — Site Editor → Styles` |
 | `component` | dev-mode framework markers | *(defined in types; not yet produced in v0.1)* |
 | `generated` | build artifact — do not edit | `uploads/elementor/css/post-88.css` + true-source hint |
@@ -213,6 +213,7 @@ Every attributed rule carries a granularity label from a fixed ladder — `line 
 Degradation is always explicit, never silent:
 
 - Source-map resolution failing (bad URL, timeout, no mapping for the range) drops `line` → `file` and appends `(source map unresolved)` to the edit hint. Sheet-relative and inline `data:` maps are supported; decoded maps are cached per sheet, and a failed load is cached too so it isn't refetched per declaration.
+- A sheet that looks minified (`.min.` in the filename, or a large payload packed into very few lines) and has **no** source map drops `line` → `file` with the bracket reading `minified, no map` — a line number into minified CSS would be noise, not information. This applies uniformly: generic URL sheets and WordPress theme/plugin files alike (`[file | plugin: elementor — minified, no map]`).
 - User-agent, injected, and inspector sheets classify as `unknown` — there is nothing editable behind them, and the label says what they are.
 - Constructed stylesheets (`CSSStyleSheet` objects, typical of CSS-in-JS in production) classify as `unknown` with a hint about what they probably are.
 - WordPress `generated` origins carry the pointer to the real edit surface (the Elementor editor, the Divi builder) and, for optimizer bundles, a `bypassHint` query param (`?nowprocket`, `?ao_noptimize=1`) so the caller can re-navigate and see the un-bundled truth.

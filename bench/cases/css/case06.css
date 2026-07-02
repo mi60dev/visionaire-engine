@@ -1,0 +1,12 @@
+/* case06.css — seeded bug: sibling margin collapse — .intro's 48px bottom margin
+ * collapses with .list's 12px top margin, so the gap is 48px no matter what the
+ * user sets on .list. LINE NUMBERS ARE LOAD-BEARING — bench/manifest.json:
+ *   line 10  .intro { margin-bottom: 48px; }  the margin that actually makes the gap
+ *   line 12  .list { margin-top: 12px; }      the margin the user keeps editing (collapsed away)
+ */
+body { font-family: sans-serif; margin: 0; padding: 24px; }
+.intro, .list { margin: 0; }
+/* line 10 ↓ */
+.intro { margin-bottom: 48px; }
+
+.list { margin-top: 12px; }

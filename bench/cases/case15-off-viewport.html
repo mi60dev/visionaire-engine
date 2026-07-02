@@ -1,0 +1,17 @@
+<!doctype html>
+<!-- SEEDED BUG: element off-viewport — the "New" badge is absolutely positioned
+     with left:-2400px (case15.css:7), fully left of the viewport and not
+     reachable by scrolling. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Bench case 15 — badge positioned off-viewport</title>
+  <link rel="stylesheet" href="css/case15.css">
+</head>
+<body>
+  <div class="product">
+    <span class="badge">New</span>
+    <h2>Espresso machine</h2>
+  </div>
+</body>
+</html>

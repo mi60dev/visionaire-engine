@@ -19,6 +19,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { findChromeExecutable, SessionManager } from '../src/session.js'
 import { explainStylesTool } from '../src/tools/explain-styles.js'
+import { inspectAncestorsTool } from '../src/tools/inspect-ancestors.js'
 import { inspectElementTool } from '../src/tools/inspect-element.js'
 import { pageOriginsTool } from '../src/tools/page-origins.js'
 import { pageSnapshotTool } from '../src/tools/page-snapshot.js'
@@ -109,6 +110,23 @@ describe.skipIf(!chromePath)('e2e — real Chrome', () => {
       const line = res.text.split('\n').find((l) => /z-index/.test(l) && /inactive/i.test(l))
       expect(line, `no inactive z-index note in:\n${res.text}`).toBeTruthy()
     })
+
+    it('inspect_ancestors renders the #id in identity lines', async () => {
+      const res = await inspectAncestorsTool.handler(session.context(), {
+        selector: '#promo-banner',
+        concern: 'stacking',
+      })
+      expect(res.text).toContain('<div#promo-banner>')
+      expect(res.text).toContain('<body>')
+    })
+
+    it('census header has no platform suffix on a non-WordPress fixture', async () => {
+      const res = await pageSnapshotTool.handler(session.context(), {})
+      const header = res.text.split('\n')[0]!
+      expect(header).not.toContain('WordPress')
+      // The header ends at the viewport — no "(platform …)" suffix follows.
+      expect(header).toMatch(/viewport \d+x\d+$/)
+    })
   })
 
   describe('visibility.html', () => {
@@ -175,6 +193,12 @@ describe.skipIf(!chromePath)('e2e — real Chrome', () => {
       expect(res.text).toMatch(/\[(?:generated|db-entity) \| Elementor \(post 88\)/)
       expect(res.text).not.toMatch(/nowprocket|ao_noptimize/)
       expect(res.text).toMatch(/builders?:[^\n]*elementor/)
+    })
+
+    it('census header carries the platform suffix (SPEC §8.1)', async () => {
+      const res = await pageSnapshotTool.handler(session.context(), {})
+      const header = res.text.split('\n')[0]!
+      expect(header).toContain('(WordPress 6.9, theme astra, builder elementor)')
     })
 
     it('explain_styles attributes the elementor declaration to widget 4f2a1c', async () => {

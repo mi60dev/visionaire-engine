@@ -1,0 +1,17 @@
+<!doctype html>
+<!-- SEEDED BUG: zero-size collapse — every child of .hero is position:absolute
+     (case16.css:9), so .hero has no in-flow content and collapses to height 0;
+     its overflow:hidden (case16.css:8) then clips the slides away entirely. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Bench case 16 — zero-size collapse</title>
+  <link rel="stylesheet" href="css/case16.css">
+</head>
+<body>
+  <div class="hero">
+    <div class="slide">Big banner</div>
+  </div>
+  <p>Content that should sit below the hero.</p>
+</body>
+</html>

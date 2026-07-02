@@ -1,0 +1,10 @@
+/* case20.css — seeded bug: a later margin:0 shorthand silently clobbers the
+ * margin-bottom the user set on headings.
+ * LINE NUMBERS ARE LOAD-BEARING — bench/manifest.json asserts them:
+ *   line 7   .stack h2 { margin-bottom: 24px; }  the intended spacing — loses (order)
+ *   line 10  .stack h2 { margin: 0; }            reset pasted in later; its margin-bottom longhand WINS
+ */
+.stack h2 { margin-bottom: 24px; }
+
+/* line 10 ↓ a "reset" added later */
+.stack h2 { margin: 0; }

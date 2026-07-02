@@ -1,0 +1,18 @@
+<!doctype html>
+<!-- SEEDED BUG: shorthand clobbers longhand — `.stack h2 { margin: 0 }`
+     (case20.css:10, pasted in as a "reset") expands to margin-bottom:0 and wins
+     on source order over the intended `.stack h2 { margin-bottom: 24px }`
+     (case20.css:7) — headings lose their spacing. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Bench case 20 — margin shorthand clobbers margin-bottom</title>
+  <link rel="stylesheet" href="css/case20.css">
+</head>
+<body>
+  <div class="stack">
+    <h2>Getting started</h2>
+    <p>The heading above should have 24px below it.</p>
+  </div>
+</body>
+</html>

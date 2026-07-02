@@ -1,0 +1,7 @@
+/* case03-plugin.css — seeded bug: a plugin paints the alert red with !important.
+ * LINE NUMBERS ARE LOAD-BEARING — bench/manifest.json asserts them:
+ *   line 7  .alert { background-color: #c92a2a !important; }  WINNER (importance)
+ */
+.alert { padding: 12px 16px; color: #ffffff; }
+/* line 7 ↓ */
+.alert { background-color: #c92a2a !important; }

@@ -7,17 +7,11 @@
 import { z } from 'zod'
 import { estimateTokens } from '../types.js'
 import type { PlatformInfo, SheetInfo, ToolDef } from '../types.js'
-import { detectPlatform } from '../attribution/wordpress.js'
+import { detectPlatformFromPage } from '../attribution/wordpress.js'
 
 const BUDGET_TOKENS = 1800
 
 const inputSchema = {} satisfies Record<string, z.ZodTypeAny>
-
-const MARKERS_EXPR = `(() => ({
-  generator: Array.from(document.querySelectorAll('meta[name="generator" i]'))
-    .map((m) => m.getAttribute('content') || '').filter(Boolean).join(' | ') || undefined,
-  bodyClasses: document.body ? Array.from(document.body.classList) : [],
-}))()`
 
 /** header.length is characters, ≈ bytes for ASCII CSS. */
 function kb(chars: number): string {
@@ -53,12 +47,7 @@ export const pageOriginsTool: ToolDef = {
 
     const sheets = ctx.sheets.all()
 
-    const markersRes = await ctx.cdp.send('Runtime.evaluate', {
-      expression: MARKERS_EXPR,
-      returnByValue: true,
-    })
-    const markers = (markersRes.result.value ?? {}) as { generator?: string; bodyClasses?: string[] }
-    const platform = detectPlatform(sheets, markers)
+    const platform = await detectPlatformFromPage(ctx.cdp, sheets)
 
     const files: SheetInfo[] = []
     const inline: SheetInfo[] = []

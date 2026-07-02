@@ -1,13 +1,16 @@
 /**
  * Pure resolver tests on fixture metadata — SPEC §7.3 table, no browser.
+ * Plus StylesheetRegistry.classify on hand-built headers (minified degradation).
  */
+import type { Protocol } from 'puppeteer-core'
 import { describe, expect, it } from 'vitest'
 import {
   detectPlatform,
   resolveWpOrigin,
   wpOriginToStyleOrigin,
 } from '../src/attribution/wordpress.js'
-import type { WpSheetMeta } from '../src/types.js'
+import { StylesheetRegistry } from '../src/attribution/stylesheets.js'
+import type { SheetInfo, WpSheetMeta } from '../src/types.js'
 
 const SITE = 'https://example.com'
 
@@ -104,6 +107,13 @@ describe('resolveWpOrigin — SPEC §7.3 detection table', () => {
       meta({ sourceURL: `${SITE}/wp-content/themes/astra/assets/css/minified/main.min.css?ver=4.6.2` }),
     )
     expect(wp).toEqual({ kind: 'theme', slug: 'astra' })
+  })
+
+  it('child-theme URL → kind theme (parent/child is page-level only — detectPlatform)', () => {
+    const m = meta({ sourceURL: `${SITE}/wp-content/themes/astra-child/style.css?ver=1.0` })
+    const wp = resolveWpOrigin(m)
+    expect(wp).toEqual({ kind: 'theme', slug: 'astra-child' })
+    expect(wpOriginToStyleOrigin(wp!, m).label).toBe('theme: astra-child')
   })
 
   it('plugin URL → plugin with slug', () => {
@@ -309,5 +319,104 @@ describe('detectPlatform — SPEC §7.3 page-level detection', () => {
     expect(info.childTheme).toBeUndefined()
     expect(info.builders).toEqual([])
     expect(info.optimizers).toEqual([])
+  })
+})
+
+describe('StylesheetRegistry.classify — minified granularity degradation (SPEC §8.3)', () => {
+  const registry = new StylesheetRegistry()
+
+  function sheetInfo(opts: {
+    sourceURL: string
+    length?: number
+    endLine?: number
+    sourceMapURL?: string
+  }): SheetInfo {
+    const header: Protocol.CSS.CSSStyleSheetHeader = {
+      styleSheetId: 'sheet-1',
+      frameId: 'frame-1',
+      sourceURL: opts.sourceURL,
+      origin: 'regular',
+      title: '',
+      disabled: false,
+      isInline: false,
+      isMutable: false,
+      isConstructed: false,
+      startLine: 0,
+      startColumn: 0,
+      length: opts.length ?? 1000,
+      endLine: opts.endLine ?? 40,
+      endColumn: 0,
+    }
+    if (opts.sourceMapURL !== undefined) header.sourceMapURL = opts.sourceMapURL
+    const info: SheetInfo = {
+      styleSheetId: header.styleSheetId,
+      sourceURL: opts.sourceURL,
+      isInline: false,
+      origin: 'regular',
+      header,
+    }
+    if (opts.sourceMapURL !== undefined) info.sourceMapURL = opts.sourceMapURL
+    return info
+  }
+
+  it('minified plugin bundle without a map → file granularity, "minified, no map"', () => {
+    const origin = registry.classify(
+      sheetInfo({ sourceURL: `${SITE}/wp-content/plugins/elementor/assets/css/frontend.min.css?ver=3.2` }),
+    )
+    expect(origin.granularity).toBe('file')
+    expect(origin.label).toBe('plugin: elementor')
+    expect(origin.editSurface).toBe('minified, no map')
+    expect(origin.line).toBeUndefined()
+  })
+
+  it('minified theme sheet without a map degrades too', () => {
+    const origin = registry.classify(
+      sheetInfo({ sourceURL: `${SITE}/wp-content/themes/astra/assets/css/minified/main.min.css` }),
+    )
+    expect(origin.granularity).toBe('file')
+    expect(origin.label).toBe('theme: astra')
+    expect(origin.editSurface).toBe('minified, no map')
+  })
+
+  it('minified sheet WITH a source map keeps line granularity (map restores authored positions)', () => {
+    const origin = registry.classify(
+      sheetInfo({
+        sourceURL: `${SITE}/wp-content/plugins/elementor/assets/css/frontend.min.css`,
+        sourceMapURL: 'frontend.min.css.map',
+      }),
+    )
+    expect(origin.granularity).toBe('line')
+  })
+
+  it('plain theme sheet stays line granularity', () => {
+    const origin = registry.classify(
+      sheetInfo({ sourceURL: `${SITE}/wp-content/themes/astra-child/style.css?ver=1.0` }),
+    )
+    expect(origin.granularity).toBe('line')
+    expect(origin.label).toBe('theme: astra-child')
+    expect(origin.editSurface).toBe('edit themes/astra-child/style.css')
+  })
+
+  it('heuristic: large sheet with very few lines → minified even without .min. in the name', () => {
+    const origin = registry.classify(
+      sheetInfo({ sourceURL: 'https://cdn.example.net/assets/app.3f9a.css', length: 120_000, endLine: 2 }),
+    )
+    expect(origin.granularity).toBe('file')
+    expect(origin.editSurface).toBe('minified, no map')
+  })
+
+  it('heuristic: large sheet with normal line density stays line granularity', () => {
+    const origin = registry.classify(
+      sheetInfo({ sourceURL: 'https://cdn.example.net/assets/app.3f9a.css', length: 120_000, endLine: 4000 }),
+    )
+    expect(origin.granularity).toBe('line')
+    expect(origin.editSurface).toBe('edit this file')
+  })
+
+  it('".min." matches the path only, not the query string', () => {
+    const origin = registry.classify(
+      sheetInfo({ sourceURL: `${SITE}/wp-content/themes/astra/style.css?cache=x.min.y` }),
+    )
+    expect(origin.granularity).toBe('line')
   })
 })

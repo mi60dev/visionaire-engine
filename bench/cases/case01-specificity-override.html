@@ -1,0 +1,17 @@
+<!doctype html>
+<!-- SEEDED BUG: specificity override — the user's `.btn { margin-bottom: 8px }`
+     (case01.css:14) loses to the theme's `.card .btn { margin-bottom: 32px }`
+     (case01.css:10, spec 0,2,0), so the button keeps a huge gap under it. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Bench case 01 — specificity override</title>
+  <link rel="stylesheet" href="css/case01.css">
+</head>
+<body>
+  <div class="card">
+    <a class="btn" href="#">Subscribe</a>
+    <p>Get product updates in your inbox.</p>
+  </div>
+</body>
+</html>

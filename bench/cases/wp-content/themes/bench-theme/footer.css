@@ -1,0 +1,7 @@
+/* bench-theme footer.css — case 19: the theme's footer link color, overridden
+ * by the Customizer's Additional CSS (same specificity, later in source order).
+ * LINE NUMBERS ARE LOAD-BEARING — bench/manifest.json asserts them:
+ *   line 7  .site-footer a { color: #336699; }  loses (order) to wp-custom-css
+ */
+.site-footer { padding: 24px; background-color: #f8f9fa; font-family: sans-serif; }
+.site-footer a { color: #336699; }

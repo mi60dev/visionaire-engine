@@ -16,6 +16,7 @@ import type {
 import { COMPUTED_WHITELIST } from '../types.js'
 import { resolveTarget } from '../uid.js'
 import { renderCensus } from '../format/census.js'
+import { detectPlatformFromPage } from '../attribution/wordpress.js'
 
 const ELEMENT_NODE = 1
 const TEXT_NODE = 3
@@ -249,6 +250,10 @@ async function handler(ctx: ToolContext, args: Record<string, unknown>): Promise
     title: (titleIdx >= 0 ? snap.strings[titleIdx] : undefined) ?? '',
     viewport: { width: viewport.width, height: viewport.height },
   }
+
+  // SPEC §8.1 platform suffix, e.g. "(WordPress 6.9, theme astra, builder elementor)".
+  const platform = await detectPlatformFromPage(ctx.cdp, ctx.sheets.all())
+  if (platform.platform) page.platform = platform
 
   let text = renderCensus(root, page, budgetTokens, includeInvisible)
   if (snap.documents.length > 1) {

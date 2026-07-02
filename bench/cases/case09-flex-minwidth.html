@@ -1,0 +1,18 @@
+<!doctype html>
+<!-- SEEDED BUG: flex item not shrinking — the first .cell contains an unbreakable
+     nowrap SKU string; with the implicit min-width:auto of flex items it cannot
+     shrink below its content, so the 480px .row overflows. EXPECTED_FAIL: the
+     engine has no min-width:auto diagnostic yet (see bench/manifest.json). -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Bench case 09 — flex item won't shrink (min-width:auto)</title>
+  <link rel="stylesheet" href="css/case09.css">
+</head>
+<body>
+  <div class="row">
+    <div class="cell"><span class="sku">SKU-0000000000-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX-LONG</span></div>
+    <div class="cell">Qty: 3</div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,7 @@
+/* case10.css — seeded bug: justify-content on a plain block container does
+ * nothing — the author forgot display:flex on the toolbar.
+ * LINE NUMBERS ARE LOAD-BEARING — bench/manifest.json asserts them:
+ *   line 7  .toolbar { justify-content: space-between; }  INACTIVE (non-flex container)
+ */
+/* line 7 ↓ */
+.toolbar { justify-content: space-between; padding: 8px; background-color: #e9ecef; }

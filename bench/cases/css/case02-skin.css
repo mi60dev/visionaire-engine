@@ -1,0 +1,10 @@
+/* case02-skin.css — seeded bug (half 2): a same-specificity rule in a later
+ * stylesheet wins on source order alone.
+ * LINE NUMBERS ARE LOAD-BEARING — bench/manifest.json asserts them:
+ *   line 10  .nav a { color: #777777; }  spec (0,1,1), same as base — WINNER (order)
+ */
+
+
+
+/* line 10 ↓ */
+.nav a { color: #777777; }

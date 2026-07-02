@@ -1,0 +1,9 @@
+/* case05.css — seeded bug: inherited color surprise — the fine print has no
+ * color rule of its own; it inherits red from the .promo wrapper.
+ * LINE NUMBERS ARE LOAD-BEARING — bench/manifest.json asserts them:
+ *   line 7  .promo { color: #b00020; }  WINNER via inheritance (nearest ancestor)
+ *   line 9  body { color: #1f2430; }    loses (inherited-distance)
+ */
+.promo { color: #b00020; padding: 16px; background-color: #fff5f5; }
+
+body { color: #1f2430; font-family: sans-serif; margin: 0; padding: 24px; }

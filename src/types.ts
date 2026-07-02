@@ -110,9 +110,11 @@ export interface StyleOrigin {
   wp?: WpOrigin
 }
 
+// Rule-level attribution reports child themes as 'theme' (parent/child is a
+// page-level distinction — detectPlatform); unresolved sheets return undefined
+// from resolveWpOrigin and fall through to generic classification.
 export type WpOriginKind =
   | 'theme'
-  | 'child-theme'
   | 'plugin'
   | 'customizer-css'
   | 'global-styles'
@@ -123,7 +125,6 @@ export type WpOriginKind =
   | 'elementor-global'
   | 'divi-generated'
   | 'optimizer-bundle'
-  | 'unknown'
 
 export interface WpOrigin {
   kind: WpOriginKind
@@ -260,6 +261,7 @@ export interface AncestorLine {
   uid: string
   tag: string
   classes: string[]
+  attrId?: string
   /** Concern-relevant computed props, already condensed to a short string. */
   summary: string
   /** True when this ancestor is detected as the binding constraint. */

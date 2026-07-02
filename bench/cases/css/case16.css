@@ -1,0 +1,9 @@
+/* case16.css — seeded bug: every child of .hero is position:absolute (out of
+ * flow), so the hero itself collapses to height 0; with overflow:hidden nothing
+ * paints at all. LINE NUMBERS ARE LOAD-BEARING — bench/manifest.json:
+ *   line 8  .hero { overflow: hidden; }            clips the out-of-flow children
+ *   line 9  .hero .slide { position: absolute; }   removes them from the flow
+ */
+body { margin: 0; font-family: sans-serif; }
+.hero { position: relative; overflow: hidden; }
+.hero .slide { position: absolute; top: 0; left: 0; width: 100%; height: 320px; background-color: #845ef7; }

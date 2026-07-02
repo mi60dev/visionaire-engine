@@ -1,4 +1,4 @@
-# Visionaire Engine — Technical Specification (v0.1, MVP core)
+# Visionaire Engine — Technical Specification (v0.2)
 
 > **Which rule, which file, which line — and why it wins.**
 
@@ -63,6 +63,7 @@ When a user sees a visual problem in their browser and asks an LLM to fix it, th
 | 10 | `node_at_point` | x,y → element uid (screenshot-coordinate grounding) |
 | 11 | `annotated_screenshot` | Screenshot with numbered marks == snapshot uids |
 | 12 | `style_diff` | Record styles for a target, later compare → deltas only (verify-my-fix loops) |
+| 13 | `pick_element` | Human-in-the-loop: DevTools-style hover highlight in the connected tab; the user clicks the broken element → uid |
 
 ### Tool specs
 
@@ -97,6 +98,9 @@ Screenshot via `Page.captureScreenshot` (clip for region). Marks: numbered boxes
 
 **`style_diff`** `{ ...TargetSpec, mode: 'record'|'compare', slot?: string = 'default' }`
 `record`: store whitelisted computed values + box model for the target under `slot`. `compare`: re-read and emit only changed properties (`prop: old → new`). Slots survive navigation (keyed by slot name, re-resolved by selector when uid is stale).
+
+**`pick_element`** `{ timeoutSeconds?: number = 60 }`
+Human-in-the-loop grounding with zero extra install: `Overlay.setInspectMode({ mode: 'searchForNode' })` gives the already-connected tab a DevTools-style hover highlight; the user clicks the element that looks wrong; CDP fires `Overlay.inspectNodeRequested { backendNodeId }`. The tool resolves a uid, cancels inspect mode (also on timeout or error, always), and returns the element identity line + ancestor chain + a hint to call `explain_styles`. In a headless session it proceeds but prefixes a warning that no human can see the tab (synthetic `Input.dispatchMouseEvent` clicks still work, which is also how the happy path is e2e-tested; a human picker needs `connect { headless: false }`). This replaces the v1.1 "picker overlay" roadmap item.
 
 ## 5. Data model
 
@@ -302,10 +306,11 @@ Conventions: ESM + NodeNext (**relative imports must use `.js` extension**), str
 1. **Pure-logic unit tests** (no browser): cascade verdicts on hand-built `getMatchedStylesForNode` payloads (specificity beats order; !important flips; inline vs !important; shorthand expansion; inherited proximity), inactive rules, WP resolver table, specificity parser.
 2. **E2E on real Chrome** (auto-skip if `findChromeExecutable()` fails): fixtures with *known* rule line numbers; assert `explain_styles` names the right winner, right file, right line; visibility fixture asserts each status; WP fixture asserts platform detection + Elementor widget extraction.
 3. **CDP contract smoke test**: assert presence/shape of the experimental fields we rely on.
-4. **(v1.2) Seeded-bug benchmark**: 20–30 visual bugs, measuring calling-LLM diagnosis accuracy and token cost with vs without the server.
+4. **Seeded-bug benchmark (`bench/`)**: fixture pages each seeding one known visual bug, with an expected-answer manifest (property, winning rule location, loss reason / origin markers). The deterministic runner (`npm run bench`) drives the real tools against each case and scores whether the engine's output names the true cause, plus the token cost of the context produced. This is the regression suite for explanation quality; the LLM-in-the-loop half (does the context lift model diagnosis accuracy) remains v1.2.
 
 ## 13. Roadmap
-- **v0.1 (this spec):** the 12 tools above, Chromium launch/attach, WP convention mode. Ships as `npx visionaire-engine`.
-- **v0.2:** source-map hardening, stacking/z-index explainer depth, `@layer` verdict edge cases, style_diff across viewports.
-- **v1.1:** CDP-injected click-to-pick overlay (`Overlay.setInspectMode`); WordPress companion plugin (~6 Abilities on the official mcp-adapter, WP 6.9+): enqueue registry, `_elementor_data` control resolution, Site-Editor template-override detection, staleness checks.
-- **v1.2:** the benchmark (also the marketing artifact); Firefox/BiDi investigation.
+- **v0.1 (shipped):** the first 12 tools, Chromium launch/attach, WP convention mode.
+- **v0.2 (this increment):** `pick_element` click-to-pick; the deterministic benchmark harness (`bench/`); minification-aware granularity degradation; census platform header.
+- **v0.3:** source-map hardening, stacking/z-index explainer depth, `@layer` verdict edge cases, style_diff across viewports.
+- **v1.1:** WordPress companion plugin (~6 Abilities on the official mcp-adapter, WP 6.9+): enqueue registry, `_elementor_data` control resolution, Site-Editor template-override detection, staleness checks. Needs a live WP 6.9 test site.
+- **v1.2:** LLM-in-the-loop benchmark (does the context lift diagnosis accuracy — the marketing artifact); Firefox/BiDi investigation.

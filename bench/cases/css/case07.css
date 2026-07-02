@@ -1,0 +1,12 @@
+/* case07.css — seeded bug: width:100% + horizontal padding + (default) content-box
+ * sizing — the banner's border box is 100% + 48px and overflows its 600px wrap.
+ * LINE NUMBERS ARE LOAD-BEARING — bench/manifest.json asserts them:
+ *   line 10  .promo-banner { width: 100%; }  combined with line 12's padding → overflow
+ *   line 12  .promo-banner { padding-left: 24px; padding-right: 24px; }
+ */
+body { font-family: sans-serif; margin: 0; padding: 24px; }
+.wrap { width: 600px; margin: 0 auto; background-color: #fafafa; }
+/* line 10 ↓ */
+.promo-banner { width: 100%; }
+
+.promo-banner { padding-left: 24px; padding-right: 24px; background-color: #ffd43b; }

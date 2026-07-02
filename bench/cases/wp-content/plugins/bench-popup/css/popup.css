@@ -1,0 +1,7 @@
+/* bench-popup plugin CSS — case 18: mimics a plugin restyling everything inside
+ * its popup with a higher-specificity rule.
+ * LINE NUMBERS ARE LOAD-BEARING — bench/manifest.json asserts them:
+ *   line 7  .bench-popup .wp-cta { background-color: #d63638; }  spec (0,2,0) — WINNER
+ */
+.bench-popup { padding: 16px; border: 1px solid #dee2e6; }
+.bench-popup .wp-cta { background-color: #d63638; }

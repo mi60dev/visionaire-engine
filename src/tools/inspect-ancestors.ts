@@ -23,11 +23,12 @@ function targetFromArgs(args: Record<string, unknown>): TargetSpec {
 }
 
 function identity(line: AncestorLine): string {
+  const id = line.attrId ? `#${line.attrId}` : ''
   const classes = line.classes
     .slice(0, 3)
     .map((c) => `.${c}`)
     .join('')
-  return `<${line.tag}${classes}>`
+  return `<${line.tag}${id}${classes}>`
 }
 
 function renderLine(line: AncestorLine): string {

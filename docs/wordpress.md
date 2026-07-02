@@ -57,7 +57,7 @@ Every attribution says how good the answer is ([../SPEC.md](../SPEC.md) §5.2):
 | Label | Means | On WordPress, typically |
 |---|---|---|
 | `line` | file + line known — edit exactly there | theme and plugin CSS files |
-| `file` | file known, line unreliable | core block library; source-map failures |
+| `file` | file known, line unreliable | core block library; minified `.min.css` without a source map; source-map failures |
 | `db-entity` | the origin is a **database entity** — the file (if any) is not the edit surface | Customizer CSS, Global Styles, block supports, inline handles, Elementor |
 | `generated` | generated artifact — do not edit; a truer source exists | Elementor post CSS (widget unknown), Divi et-cache, optimizer bundles |
 | `unknown` | none of the above; raw selector + sheet still shown | user-agent styles, unrecognized sheets |
@@ -135,6 +135,16 @@ Divi (Elegant Themes) compiles builder output into `wp-content/et-cache/…`. Sa
 ```
 
 For plugins the edit surface adds a warning — `(plugin updates overwrite — prefer overriding)` — because your edit dies on the next plugin update; override from the (child) theme or Additional CSS instead.
+
+**Minified files degrade honestly.** When the served theme/plugin file is minified (`.min.` in the filename, or a large sheet packed into very few lines) and carries no source map, a line number into it would be meaningless — so the granularity degrades from `line` to `file`, no line number is printed, and the bracket says why:
+
+```
+→ plugins/elementor/assets/css/frontend.min.css  [file | plugin: elementor — minified, no map]
+```
+
+A minified sheet *with* a source map keeps `line` granularity — the map resolves declarations back to their authored positions.
+
+A child theme is just another theme slug here: rule-level attribution reports `theme: astra-child` with the concrete file path. Telling parent from child happens only at page level, in `detectPlatform()` (see [below](#platform-detection-in-page_origins)).
 
 These rules run *last* so that generated URLs (Elementor, et-cache, optimizer caches) never get misclassified as innocent files.
 
@@ -240,7 +250,7 @@ stylesheets on https://wordpress.org/: 35 total (14 files, 20 inline, 1 user-age
 https://wordpress.org/wp-content/mu-plugins/pub-sync/global-fonts/NotoSerif/NotoSerifSC/style.css — 114 KB [line | wordpress.org]
 themes/wporg-main-2022/build/style/style-index.css — 98.8 KB [line | theme: wporg-main-2022]
 themes/wporg-parent-2021/build/style.css — 66.1 KB [line | theme: wporg-parent-2021]
-plugins/gutenberg/build/styles/block-library/navigation/style.min.css — 20.3 KB [line | plugin: gutenberg]
+plugins/gutenberg/build/styles/block-library/navigation/style.min.css — 20.3 KB [file | plugin: gutenberg]
 …
 <style#global-styles-inline-css> — 35.9 KB [db-entity | Global Styles]
 <style#core-block-supports-inline-css> — 4.4 KB [db-entity | block supports CSS]

@@ -8,6 +8,30 @@ import type { SheetInfo, StyleOrigin, StylesheetRegistryLike, WpSheetMeta } from
 import { pairAttributes } from '../uid.js'
 import { resolveWpOrigin, wpOriginToStyleOrigin } from './wordpress.js'
 
+const MINIFIED_FILENAME = /\.min\./
+// Heuristic for minified sheets without the .min. naming convention: a large
+// payload packed into very few lines. header.length (chars) / (endLine + 1)
+// approximates chars-per-line; hand-written CSS stays far below 200.
+const MINIFIED_MIN_CHARS = 4096
+const MINIFIED_CHARS_PER_LINE = 200
+
+function looksMinified(sheet: SheetInfo): boolean {
+  const path = sheet.sourceURL.split(/[?#]/)[0] ?? ''
+  if (MINIFIED_FILENAME.test(path)) return true
+  const lines = sheet.header.endLine + 1
+  return sheet.header.length >= MINIFIED_MIN_CHARS && sheet.header.length / lines >= MINIFIED_CHARS_PER_LINE
+}
+
+/**
+ * SPEC §5.2/§8.3: a minified sheet with no source map has untrustworthy line
+ * numbers — degrade 'line' → 'file' and say so ("[file | … — minified, no map]").
+ * With a source map present, sourcemaps.ts restores authored positions instead.
+ */
+function degradeMinified(origin: StyleOrigin, sheet: SheetInfo): StyleOrigin {
+  if (origin.granularity !== 'line' || sheet.sourceMapURL || !looksMinified(sheet)) return origin
+  return { ...origin, granularity: 'file', editSurface: 'minified, no map' }
+}
+
 export class StylesheetRegistry implements StylesheetRegistryLike {
   private sheets = new Map<string, SheetInfo>()
   /** styleSheetId → ownerNode backendNodeId still awaiting DOM.describeNode. */
@@ -88,7 +112,7 @@ export class StylesheetRegistry implements StylesheetRegistryLike {
     if (sheet.ownerNodeAttrId !== undefined) meta.ownerNodeAttrId = sheet.ownerNodeAttrId
     if (selector !== undefined) meta.selector = selector
     const wp = resolveWpOrigin(meta)
-    if (wp) return wpOriginToStyleOrigin(wp, meta)
+    if (wp) return degradeMinified(wpOriginToStyleOrigin(wp, meta), sheet)
 
     if (!sheet.sourceURL || sheet.header.isConstructed) {
       return { granularity: 'unknown', label: 'constructed stylesheet (CSS-in-JS production mode?)' }
@@ -112,12 +136,15 @@ export class StylesheetRegistry implements StylesheetRegistryLike {
       } catch {
         // unparseable — leave label empty, the location line shows the raw URL
       }
-      return {
-        granularity: 'line',
-        label: host,
-        file: sheet.sourceURL,
-        editSurface: 'edit this file',
-      }
+      return degradeMinified(
+        {
+          granularity: 'line',
+          label: host,
+          file: sheet.sourceURL,
+          editSurface: 'edit this file',
+        },
+        sheet,
+      )
     }
     // Odd scheme (blob:, chrome-extension:, …): file identity known, line not actionable.
     return { granularity: 'file', label: sheet.sourceURL, file: sheet.sourceURL }

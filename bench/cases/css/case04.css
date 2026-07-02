@@ -1,0 +1,7 @@
+/* case04.css — seeded bug: a stylesheet color loses to the element's inline
+ * style attribute (left over from a copy-pasted embed snippet).
+ * LINE NUMBERS ARE LOAD-BEARING — bench/manifest.json asserts them:
+ *   line 7  .headline { color: #123a63; }  loses (inline)
+ */
+/* line 7 ↓ */
+.headline { color: #123a63; }

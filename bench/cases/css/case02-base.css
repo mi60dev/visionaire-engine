@@ -1,0 +1,10 @@
+/* case02-base.css — seeded bug (half 1): the intended nav link color.
+ * LINE NUMBERS ARE LOAD-BEARING — bench/manifest.json asserts them:
+ *   line 10  .nav a { color: #0055ff; }  loses (order) to case02-skin.css:10
+ */
+body { font-family: sans-serif; margin: 0; padding: 24px; }
+.nav { padding: 12px; background-color: #f1f3f5; }
+.nav a { text-decoration: none; margin-right: 16px; }
+
+/* line 10 ↓ */
+.nav a { color: #0055ff; }

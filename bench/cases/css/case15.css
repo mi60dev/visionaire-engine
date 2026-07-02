@@ -1,0 +1,9 @@
+/* case15.css — seeded bug: the "New" badge was absolutely positioned with
+ * left:-2400px (a leftover debug value), pushing it fully off-screen.
+ * LINE NUMBERS ARE LOAD-BEARING — bench/manifest.json asserts them:
+ *   line 7  .badge { position: absolute; left: -2400px; }
+ */
+/* line 7 ↓ */
+.badge { position: absolute; top: 12px; left: -2400px; padding: 4px 10px; background-color: #e8590c; color: #ffffff; }
+
+.product { position: relative; padding: 24px; font-family: sans-serif; }

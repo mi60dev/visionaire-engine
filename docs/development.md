@@ -33,7 +33,7 @@ CDP protocol types come from `puppeteer-core` (SPEC §10) — there is no separa
 git clone <repo> && cd visionaire-engine
 npm install
 npm run build     # tsc → dist/
-npm test          # 112 tests; e2e part auto-skips without Chrome
+npm test          # 125 tests; e2e part auto-skips without Chrome
 ```
 
 ## Commands
@@ -41,8 +41,9 @@ npm test          # 112 tests; e2e part auto-skips without Chrome
 | Command | What it runs | Notes |
 |---|---|---|
 | `npm run build` | `tsc -p tsconfig.json` | Emits `dist/` with declarations + source maps. `dist/index.js` is the `bin` entry. |
-| `npm test` | `vitest run` | All 4 test files. 60 s test/hook timeouts (browser startup headroom). |
+| `npm test` | `vitest run` | All 5 test files. 60 s test/hook timeouts (browser startup headroom). |
 | `npm run dev` | `tsx src/index.ts` | The MCP server from source, on stdio. It waits for an MCP client on stdin — see [Registering with MCP clients](#registering-with-mcp-clients) before wiring it up. |
+| `npm run bench` | `tsx bench/run.ts` | The 20-case seeded-bug benchmark on real headless Chrome — see [Benchmark](#benchmark). |
 | `npm run demo` | `tsx scripts/demo.ts` | CLI loop with no MCP client needed — see below. |
 
 ### The demo
@@ -103,18 +104,19 @@ client, no build step (tsx runs TypeScript directly).
 
 ## Tests
 
-Four files, 112 tests total (94 pure unit + 18 e2e):
+Five files, 125 tests total (102 pure unit + 23 e2e):
 
 | File | Tests | Browser? | What it covers |
 |---|---|---|---|
 | `test/cascade.test.ts` | 46 | no | `computeCascade` + the specificity parser, on hand-built `CSS.getMatchedStylesForNode` payloads: specificity vs order, `!important` flips, inline vs `!important`, shorthand expansion, inherited proximity, `@layer`. |
 | `test/inactive.test.ts` | 16 | no | The inactive-declaration rule table (`findInactiveDeclarations`). |
-| `test/wordpress.test.ts` | 32 | no | The WP detection table (`resolveWpOrigin`), origin rendering (`wpOriginToStyleOrigin`), and page-level `detectPlatform` — all on plain metadata objects. |
-| `test/e2e.test.ts` | 18 | **real headless Chrome** | Drives the ToolDefs directly (`handler(ctx, args)`, not the MCP transport) against `test/fixtures/*.html`. |
+| `test/wordpress.test.ts` | 40 | no | The WP detection table (`resolveWpOrigin`), origin rendering (`wpOriginToStyleOrigin`), minified-sheet degradation (`StylesheetRegistry.classify`), and page-level `detectPlatform` — all on plain metadata objects. |
+| `test/e2e.test.ts` | 21 | **real headless Chrome** | Drives the ToolDefs directly (`handler(ctx, args)`, not the MCP transport) against `test/fixtures/*.html`. |
+| `test/pick.e2e.test.ts` | 2 | **real headless Chrome** | `pick_element`: synthetic-click happy path and the timeout path (proves inspect mode really exits). |
 
 The unit tests are pure functions over constructed data — they run in
-milliseconds and need no browser. The e2e file wraps everything in
-`describe.skipIf(!chromePath)`, so `npm test` still passes (with the e2e file
+milliseconds and need no browser. Both e2e files wrap everything in
+`describe.skipIf(!chromePath)`, so `npm test` still passes (with the e2e files
 skipped) on machines without Chrome.
 
 ### Fixture line numbers are load-bearing
@@ -153,16 +155,72 @@ npx vitest run test/inactive.test.ts        # one file
 npx vitest run -t "letter-spacing"          # by test name
 ```
 
+## Benchmark
+
+`bench/` is the seeded-bug benchmark harness (SPEC §12 item 4) — the regression
+suite for *explanation quality*, separate from `npm test`. Each fixture page
+under `bench/cases/` seeds exactly **one** known visual bug a real developer
+would report ("the subscribe button has too much space under it").
+`bench/manifest.json` records, per case: the user-phrased symptom, the target
+element, which tool should reveal the cause (`explain_styles` |
+`inspect_element` | `inspect_ancestors`), the tool args, and the `expected`
+substrings that must ALL appear in the tool output for a pass. Markers are
+chosen to prove the engine named the **true cause** — the winning `file:line`,
+`lost (specificity)`, `occluded by`, `[BINDING]` — never incidental strings or
+full formatted lines (those are cosmetic and may be reworded).
+
+```bash
+npm run bench             # all 20 cases (~5 s on real headless Chrome)
+npx tsx bench/run.ts      # the same, without the npm script
+npx tsx bench/run.ts 11   # a single case by manifest id
+```
+
+The runner launches one headless `SessionManager`, navigates to each `file://`
+fixture, and drives the named ToolDef handler directly (`handler(ctx, args)`,
+like the e2e suite). It prints a per-case table — id, status, tool-output
+tokens, and the tokens of one `page_snapshot` per case (the census an agent
+would realistically spend to find the element), reported separately — then a
+summary line: `N/20 pass, median context tokens X`. Failed cases print their
+missing markers plus the full tool output. Exit code 1 on any FAIL, so it is
+CI-usable.
+
+### Adding a case
+
+1. Create `bench/cases/caseNN-<slug>.html` with its CSS under
+   `bench/cases/css/`. WordPress-flavored cases put sheets under
+   `bench/cases/wp-content/{themes,plugins}/…` so the URL-convention resolver
+   (SPEC §7.3) fires. Seed exactly one bug and state it in a comment at the top
+   of the page.
+2. Culprit-rule **line numbers are load-bearing**, same convention as
+   `test/fixtures/css/`: comment-pad the CSS so the rule sits at the line the
+   manifest asserts, and document that line in the file's header comment.
+3. Append a manifest entry: `{ id, file, user_report, target, tool, args,
+   expected }`. `user_report` is one sentence phrased as a user would describe
+   the symptom, not the diagnosis.
+4. Run `npx tsx bench/run.ts <id>` until green — without weakening the markers
+   below what proves causation.
+
+### The XFAIL convention
+
+When the engine genuinely cannot name a cause yet, do **not** weaken a case to
+make it pass. Keep the ideal cause-proving markers and mark the manifest entry
+`"expected_fail": true` with a `"reason"` naming the missing engine capability
+(case 9 — the implicit `min-width:auto` of flex items — is the current
+example). The runner reports such cases as XFAIL, not FAIL, and they do not
+affect the exit code. If the engine later learns to name the cause, the case
+flips to XPASS and the runner exits 1 with `XPASS: tighten the manifest` —
+remove `expected_fail` and firm up the markers.
+
 ## Project layout
 
 ```
 src/
   index.ts          # bin entry: stdio transport, graceful shutdown
-  server.ts         # createServer(session) — registers all 12 tools; owns connect/navigate/set_viewport
+  server.ts         # createServer(session) — registers all 13 tools; owns connect/navigate/set_viewport
   session.ts        # SessionManager (launch/attach Chrome, CDP domains); findChromeExecutable()
   types.ts          # every shared contract, incl. ToolDef and COMPUTED_WHITELIST
   uid.ts            # UidRegistry + resolveTarget (uid | selector | x,y → node)
-  tools/            # nine ToolDefs, one file each (page-snapshot, explain-styles, …)
+  tools/            # ten ToolDefs, one file each (page-snapshot, explain-styles, …)
   engine/           # pure deterministic engines: cascade, specificity, inactive, visibility, stacking, box-model, ancestors
   attribution/      # stylesheets registry, sourcemaps, wordpress resolver
   format/           # census + dossier renderers (token-budgeted plain text)
@@ -322,7 +380,11 @@ a granularity from the honesty ladder (`line > file > db-entity > component >
 generated > unknown`), a human `label`, and an actionable `editSurface`. Be
 honest here: a generated file that exists on disk but is not the thing to edit
 gets `granularity: 'generated'` and an editSurface pointing at the real control
-(see the `elementor-post` and `divi-generated` entries).
+(see the `elementor-post` and `divi-generated` entries). Note: the
+rule-level `child-theme` and `unknown` kinds were removed in v0.2 —
+parent/child theme detection is page-level only (`detectPlatform`), and
+sheets no rule matches fall through to the generic classifier instead of a
+catch-all kind.
 
 Steps for a new pattern:
 
@@ -432,14 +494,16 @@ protocol stream before the server even starts. Invoke `node dist/index.js` or
 
 Summarized from [../SPEC.md](../SPEC.md) §13:
 
-- **v0.1 (shipped, this codebase):** the 12 tools, Chromium launch/attach,
+- **v0.1 (shipped):** the first 12 tools, Chromium launch/attach,
   WordPress convention mode (zero WP cooperation).
-- **v0.2:** source-map hardening, deeper stacking/z-index explanations,
+- **v0.2 (shipped, this codebase):** `pick_element` click-to-pick (the 13th
+  tool, via `Overlay.setInspectMode`); the deterministic seeded-bug benchmark
+  harness (`bench/`, run with `npm run bench`); minification-aware granularity
+  degradation; census platform header.
+- **v0.3:** source-map hardening, deeper stacking/z-index explanations,
   `@layer` verdict edge cases, `style_diff` across viewports.
-- **v1.1:** CDP-injected click-to-pick overlay (`Overlay.setInspectMode`);
-  a WordPress companion plugin (~6 Abilities on the official mcp-adapter,
-  WP 6.9+) for enqueue-registry lookups, Elementor control resolution, and
-  template-override detection.
-- **v1.2:** a seeded-bug benchmark (20–30 visual bugs, measuring LLM diagnosis
-  accuracy and token cost with vs without the server); Firefox/BiDi
-  investigation.
+- **v1.1:** a WordPress companion plugin (~6 Abilities on the official
+  mcp-adapter, WP 6.9+) for enqueue-registry lookups, Elementor control
+  resolution, and template-override detection.
+- **v1.2:** the LLM-in-the-loop half of the benchmark (does the context lift
+  model diagnosis accuracy and cut token cost); Firefox/BiDi investigation.

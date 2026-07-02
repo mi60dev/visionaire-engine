@@ -1,0 +1,17 @@
+<!doctype html>
+<!-- SEEDED BUG: hidden by ancestor display:none — #cta itself has no hiding rule;
+     its .mobile-menu ancestor is display:none (case13.css:7), so the button is
+     gone from the page entirely. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Bench case 13 — hidden by ancestor display:none</title>
+  <link rel="stylesheet" href="css/case13.css">
+</head>
+<body>
+  <nav class="mobile-menu">
+    <a id="cta" href="#">Sign up</a>
+  </nav>
+  <p>Main content.</p>
+</body>
+</html>

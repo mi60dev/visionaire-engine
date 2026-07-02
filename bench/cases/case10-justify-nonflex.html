@@ -1,0 +1,18 @@
+<!doctype html>
+<!-- SEEDED BUG: justify-content on a non-flex parent — .toolbar sets
+     justify-content: space-between (case10.css:7) but is display:block, so the
+     declaration is inactive and the buttons stay bunched to the left. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Bench case 10 — justify-content on a non-flex container</title>
+  <link rel="stylesheet" href="css/case10.css">
+</head>
+<body>
+  <div class="toolbar">
+    <button>Save</button>
+    <button>Preview</button>
+    <button>Publish</button>
+  </div>
+</body>
+</html>
