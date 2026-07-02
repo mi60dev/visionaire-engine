@@ -79,9 +79,7 @@
     "target": { "selector": ".cell" },
     "tool": "inspect_ancestors",
     "args": { "concern": "width" },
-    "expected": ["min-width", "shrink"],
-    "expected_fail": true,
-    "reason": "The engine has no diagnostic for the implicit min-width:auto of flex items: engine/inactive.ts has no rule for it and engine/ancestors.ts only prints min-width when it differs from 0px/auto, so no output names the shrink blocker."
+    "expected": ["min-width:auto (flex item)", "prevents shrinking below content", "[BINDING]"]
   },
   {
     "id": 10,
@@ -181,5 +179,38 @@
     "tool": "explain_styles",
     "args": { "property": "margin-bottom" },
     "expected": ["WINNER", "(from margin)", "case20.css:10", "lost (order)", "24px", "case20.css:7"]
+  },
+  {
+    "id": 21,
+    "file": "cases/case21-display-kills-transition.html",
+    "user_report": "The hide sidebar button animation does not work properly, it is not hiding the sidebar smoothly.",
+    "target": { "selector": ".toggle" },
+    "tool": "record_interaction",
+    "args": {},
+    "serve": "http",
+    "expected": ["CANCELLED", "display", "case21-sidebar.js"],
+    "notes": "Flagship v0.3 case (SPEC §14.5): the timeline must name the CANCELLED width transition, the display change that killed it, and the handler file. Served over http because LoAF script attribution is empty on file:// pages. The kill is on a 100ms timeout so the transition genuinely STARTS before dying (a same-task kill never reaches animationStarted — CDP then carries no target for the cancelled animation and the verdict degrades to the weaker 'never started' line)."
+  },
+  {
+    "id": 22,
+    "file": "cases/case22-listener-wrong-element.html",
+    "user_report": "Clicking the promo banner's close button does nothing.",
+    "target": { "selector": ".close-btn" },
+    "tool": "get_listeners",
+    "args": { "eventType": "click" },
+    "serve": "http",
+    "expected": ["close-btn", "none for click", "none up the chain"],
+    "notes": "The honest absence IS the diagnosis: the handler sits on the hidden .close-icon sibling (js/case22-banner.js), so the right element has no click listener and includeAncestors (default) surfaces nothing relevant up the chain — 'none for click' proves the element-level absence, 'none up the chain' proves ancestors/document/window were checked too."
+  },
+  {
+    "id": 23,
+    "file": "cases/case23-zero-duration-transition.html",
+    "user_report": "My card should fade in but it just pops.",
+    "target": { "selector": ".card" },
+    "tool": "explain_animations",
+    "args": { "property": "opacity" },
+    "serve": "http",
+    "expected": ["opacity", "0s", "instant"],
+    "notes": "Seeds the R4 finding (SPEC §14.3): `transition: opacity` declares the property but leaves transition-duration at its 0s default, so the change is instant by design. args.property carries the user's expectation ('should fade in' → opacity), which is what arms the R4 check. Empirically verified: computed transition-property=opacity, transition-duration=0s, and getAnimations() stays empty (zero-duration transitions never run), so the declared-half analysis must carry the case."
   }
 ]

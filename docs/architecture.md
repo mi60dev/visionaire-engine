@@ -29,20 +29,25 @@ CDP also means zero site cooperation (no build step, no plugin, no snippet) and 
 │ MCP client │◄────────►│ visionaire-engine (Node, TypeScript, no LLM inside)   │
 │ (Claude    │          │                                                       │
 │  Code,     │          │  index.ts ── stdio transport, shutdown                │
-│  Cursor…)  │          │  server.ts ─ registers 13 tools                       │
+│  Cursor…)  │          │  server.ts ─ registers 16 tools                       │
 └────────────┘          │  session.ts ─ SessionManager ── puppeteer-core ── CDP │
                         │       │            │                                  │
                         │  uid.ts (registry) │  attribution/stylesheets.ts      │
                         │                    │  (CSS.styleSheetAdded listener)  │
+                        │                    │  attribution/scripts.ts          │
+                        │                    │  (Debugger.scriptParsed listener)│
                         │  tools/  ──────────┼────────────────────────────      │
                         │   Pass 1: page_snapshot → DOMSnapshot census          │
                         │   Pass 2: inspect_element / explain_styles /          │
                         │           inspect_ancestors → per-node dossiers       │
+                        │   Time:   get_listeners / explain_animations /        │
+                        │           record_interaction → causal timelines       │
                         │       │                                               │
                         │  engine/      cascade · specificity · inactive ·      │
                         │               visibility · stacking · box-model ·     │
-                        │               ancestors                               │
-                        │  attribution/ stylesheets · sourcemaps · wordpress    │
+                        │               ancestors · animations                  │
+                        │  attribution/ stylesheets · sourcemaps · wordpress ·  │
+                        │               scripts                                 │
                         │  format/      census · dossier   (token-budgeted)     │
                         └───────────────────────────────────────────────────────┘
                                           │
@@ -68,12 +73,14 @@ src/
                   stdout is the MCP protocol; all diagnostics go to stderr.
   server.ts       createServer(session): registers connect / navigate /
                   set_viewport inline (their zod schemas live here) plus the
-                  ten ToolDefs from tools/. Wraps every handler so errors
+                  thirteen ToolDefs from tools/. Wraps every handler so errors
                   come back as isError text, never a crashed server.
   session.ts      SessionManager: find Chrome (CHROME_PATH or per-OS paths),
                   launch via puppeteer-core or attach to a running browser,
                   enable the CDP domains (DOM, Page, CSS, DOMSnapshot,
-                  Overlay), wire uid + stylesheet registries to navigation.
+                  Overlay, Debugger — with setSkipAllPauses so a page-side
+                  `debugger;` can never freeze the tab), wire uid +
+                  stylesheet + script registries to navigation.
   types.ts        every shared contract: TargetSpec, ToolDef, DeclarationInfo,
                   PropertyVerdict, VisibilityReport, StyleOrigin, the
                   COMPUTED_WHITELIST, estimateTokens (chars / 4).
@@ -91,6 +98,10 @@ src/
     node-at-point.ts      x,y → uid + ancestor chain
     annotated-screenshot.ts  screenshot, mark numbers == uid numbers
     style-diff.ts         record/compare slots for verify-my-fix loops
+    pick-element.ts       human-in-the-loop click-to-pick (Overlay inspect mode)
+    get-listeners.ts      event listeners with handler file:line (§14.2)
+    explain-animations.ts animation census + declared rules + "not smooth" findings
+    record-interaction.ts one interaction → source-attributed causal timeline
 
   engine/         pure(ish) decision logic — the deterministic core
     cascade.ts      per-longhand winner/loser resolution (see below)
@@ -106,7 +117,10 @@ src/
     box-model.ts    DOM.getBoxModel quads → content/padding/border/margin
                     summary (bounding-box approximation under transforms)
     ancestors.ts    self→root walk emitting concern-relevant facts per
-                    ancestor and flagging the binding constraint
+                    ancestor and flagging the binding constraint — including
+                    the flex min-width:auto shrink trap (see below)
+    animations.ts   the closed "not smooth" ruleset R1–R6 (SPEC §14.3), pure
+                    functions over census + computed styles + declarations
 
   attribution/    "which editable thing produced this rule"
     stylesheets.ts  StylesheetRegistry — listens to CSS.styleSheetAdded from
@@ -120,6 +134,10 @@ src/
                     Global Styles, Elementor post/widget, theme, plugin,
                     optimizer bundles with bypass hints; plus page-level
                     platform detection
+    scripts.ts      ScriptRegistry — the JS mirror of the stylesheet registry:
+                    Debugger.scriptParsed → scriptId → url + source map, WP
+                    origin lens for script URLs, delegation-framework
+                    classification (react-dom / jquery / vue)
 
   format/         plain-text renderers, the product's face
     census.ts       nested tree renderer with the three-stage budget pruner
@@ -127,7 +145,7 @@ src/
                     verdict blocks, "→ location [granularity | origin]" lines
 ```
 
-The pure engines (`cascade`, `specificity`, `inactive`, `stacking`) and `attribution/wordpress.ts` take data, not a browser — cascade verdicts are unit-tested on hand-built `getMatchedStylesForNode` payloads, and the WP resolver on fixture metadata, with no Chrome in the loop. (`visibility`, `ancestors`, and `box-model` drive CDP directly and are exercised by the e2e suite instead.)
+The pure engines (`cascade`, `specificity`, `inactive`, `stacking`, `animations`) and `attribution/wordpress.ts` take data, not a browser — cascade verdicts are unit-tested on hand-built `getMatchedStylesForNode` payloads, the WP resolver on fixture metadata, and the R1–R6 animation rules on constructed census/computed inputs, with no Chrome in the loop. (`visibility`, `ancestors`, and `box-model` drive CDP directly and are exercised by the e2e suite instead.)
 
 ## The cascade verdict algorithm
 
@@ -220,6 +238,26 @@ Degradation is always explicit, never silent:
 - Experimental CDP fields are feature-detected: missing `specificity` → own parser; missing `parentLayoutNodeId` → in-page fallback probe; snapshot extras rejected by older Chrome → retried without.
 
 The same honesty rule applies to verdicts (`verdict-uncertain`) and to budget pruning (`[38 nodes pruned: …]`, `[4 more properties — ask with property:]`): the output always says what it is *not* telling you.
+
+## The time dimension
+
+Everything above explains a frozen moment. The v0.3 tools (`get_listeners`, `explain_animations`, `record_interaction` — SPEC §14) add *what happened and why*, and they follow one paradigm:
+
+**Platform-native attribution is the substrate.** Chrome already computes, passively and without perturbing the page, the three attribution signals that matter:
+
+- **Long Animation Frames** (`PerformanceObserver`, type `long-animation-frame`): which script ran in a slow frame, with `sourceURL` / `sourceFunctionName` / `sourceCharPosition` and the `invoker` that triggered it. Caveats the output states honestly: the attribution names the *entry-point* function (not the full call chain), covers same-origin scripts, and is empty on `file://` pages (opaque origin) — which is why the interaction fixtures and bench cases are served over a local HTTP server.
+- **`layout-shift` entries** carry `sources[]` — the elements that moved, joined back to uids with pixel deltas.
+- **`DOM.getNodeStackTraces`** (gated by `DOM.setNodeStackTracesEnabled`, turned on only inside a recording window because the overhead is real): the creation stack for inserted nodes → top frame → ScriptRegistry → file:line. There is *no* equivalent for attribute/class mutations, so those are labeled `(mutation attribution unavailable — creation stacks cover node insertions only)`, softened to "likely `script:line`" when exactly one script ran in that frame.
+
+`record_interaction` merges and time-aligns these existing signals with the CDP Animation and DOM mutation event streams, keyed to uids. Two protocol facts shape the merge (both verified empirically): CDP DOM mutation events fire only for nodes the frontend already knows, so the recording window starts with `DOM.getDocument({depth:-1, pierce:true})`; and CDP DOM events carry **no timestamps**, so arrival order is authoritative and `t=` offsets are best-effort wall clock. The CDP Animation domain contributes its event stream (`animationStarted`/`animationCanceled` — the "transition CANCELLED mid-flight" verdict) but has **zero source attribution**; that join is ours.
+
+**Passive capture only.** No DOM breakpoints in v0.3: pausing the main thread mid-interaction cancels and desyncs the very animations under investigation. An opt-in breakpoint-attribution mode (for attribute mutations, the one gap above) is a documented v0.4 candidate. The same principle rules out the obvious build-vs-buy alternative: **rrweb was rejected** because it records *what* changed for visual replay — never *which script* caused it, which is the entire point here — and its in-page MutationObserver capture perturbs the main thread it is supposed to observe.
+
+**ScriptRegistry** (`src/attribution/scripts.ts`) is the JS mirror of the stylesheet registry: the session enables `Debugger` at connect (immediately followed by `Debugger.setSkipAllPauses` so a page-side `debugger;` statement cannot freeze the tab — the flag does not survive a disable/enable toggle, so every re-enable re-sets it), the registry caches `Debugger.scriptParsed` headers (scriptId → url, source map), resolves positions 1-based through the same `@jridgewell/trace-mapping` cache as CSS, and runs script URLs through the WordPress origin lens — a handler at `/wp-content/plugins/some-slider/js/main.js:88` is labeled `[plugin: some-slider]` exactly like a stylesheet would be. It clears on navigation with the same disable/enable resync discipline as sheets.
+
+**Attribution, not comprehension.** The tools name the handler/rule/mutation at file:line; the calling LLM reads the source. Framework internals stay out of scope: a react-dom/jquery/vue root listener is labeled `delegated (framework)` with an explicit "component handler not resolvable at the DOM level" note instead of a guessed JSX handler.
+
+**Output discipline** is the ARIA-live-region playbook: delta-first, coalesced (`+18 similar attribute changes under e12`), and hard-capped (`maxEvents`, default 40) — a busy page emits hundreds of events per interaction, and a raw dump is a bug, not a feature.
 
 ## uid lifecycle
 

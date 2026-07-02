@@ -1,6 +1,6 @@
 {
   "name": "visionaire-engine",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Deterministic rendered-page → LLM context MCP server: which rule, which file, which line — and why it wins.",
   "type": "module",
   "bin": {

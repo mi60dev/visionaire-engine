@@ -1,6 +1,6 @@
 /**
  * MCP server assembly: three session tools owned here (connect / navigate /
- * set_viewport) plus the ten ToolDef tools from src/tools/. SPEC §4, §11.
+ * set_viewport) plus the thirteen ToolDef tools from src/tools/. SPEC §4, §11, §14.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
@@ -8,14 +8,17 @@ import { z } from 'zod'
 import type { SessionManager } from './session.js'
 import type { ToolDef, ToolResult } from './types.js'
 import { annotatedScreenshotTool } from './tools/annotated-screenshot.js'
+import { explainAnimationsTool } from './tools/explain-animations.js'
 import { explainStylesTool } from './tools/explain-styles.js'
 import { findElementsTool } from './tools/find-elements.js'
+import { getListenersTool } from './tools/get-listeners.js'
 import { inspectAncestorsTool } from './tools/inspect-ancestors.js'
 import { inspectElementTool } from './tools/inspect-element.js'
 import { nodeAtPointTool } from './tools/node-at-point.js'
 import { pageOriginsTool } from './tools/page-origins.js'
 import { pageSnapshotTool } from './tools/page-snapshot.js'
 import { pickElementTool } from './tools/pick-element.js'
+import { recordInteractionTool } from './tools/record-interaction.js'
 import { styleDiffTool } from './tools/style-diff.js'
 
 /** When-to-use descriptions surfaced to the calling LLM; fall back to the ToolDef's own. */
@@ -40,6 +43,12 @@ const DESCRIPTIONS: Record<string, string> = {
     "Record an element's styles into a named slot, then compare later and see only the changed properties. Use for verify-my-fix loops: record, apply the change, compare.",
   pick_element:
     'Let the human point at the element: turns on a DevTools-style hover highlight in the connected tab and waits for them to click, returning the clicked element\'s uid and ancestor chain. Use when the user says "I\'ll show you" / "let me click it", or when find_elements/screenshot grounding failed to pin down the element. Needs a visible browser window (connect { headless: false }).',
+  get_listeners:
+    'List the event listeners on an element — and, by default, delegated listeners up the ancestor chain, document, and window: event type, handler file:line (source-mapped, WordPress-origin-labeled), and the bug-prone flags capture/passive/once. Use to answer "which JS file handles this button?" or when a click/submit/keypress does nothing (a passive listener silently ignores preventDefault).',
+  explain_animations:
+    'Explain the animations and transitions on one element: a census of what is running right now (type, play state, timing, animated properties) plus the declared transition/animation/@keyframes rules attributed to file:line, checked against a closed ruleset of known causes. Use when an animation or transition is not smooth, not running at all, or jumps instead of animating; pass the optional property (e.g. "opacity") to check why THAT property does not animate.',
+  record_interaction:
+    'Observe what actually happens when an element is clicked or hovered (or while the human interacts manually): records one interaction and returns a source-attributed causal timeline — handler file:line, DOM mutations, animations started/cancelled, layout shifts, console errors — uid-keyed and coalesced. Use when you need to see cause and effect over time, e.g. "the sidebar does not hide smoothly" or "clicking the button does something wrong".',
 }
 
 function ok(text: string): CallToolResult {
@@ -154,6 +163,9 @@ export function createServer(session: SessionManager): McpServer {
     annotatedScreenshotTool,
     styleDiffTool,
     pickElementTool,
+    getListenersTool,
+    explainAnimationsTool,
+    recordInteractionTool,
   ]
   for (const def of toolDefs) registerToolDef(server, session, def)
 

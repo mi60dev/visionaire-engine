@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>get_listeners fixture — SPEC §14.2/§14.5</title>
+</head>
+<body>
+  <main id="stage">
+    <button id="direct-btn" class="btn">Save draft</button>
+    <div id="scroll-area" style="height:80px;overflow:auto"><div style="height:400px">tall scrollable content</div></div>
+    <button id="once-btn" class="btn">Load more</button>
+    <button id="inline-btn" class="btn" onclick="this.dataset.inlineClicked='yes'">Inline legacy</button>
+  </main>
+  <!-- real external files so file:line attribution is testable; the inline onclick above sits on line 12 (load-bearing) -->
+  <script src="js/handlers.js"></script>
+  <script src="js/jquery.min.js"></script>
+</body>
+</html>

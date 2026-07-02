@@ -1,0 +1,10 @@
+/* case22.css — banner styling. The old decorative .close-icon was hidden when
+ * the real <button class="close-btn"> replaced it, but the span (and the JS
+ * that targets it) was never deleted — the classic dead-refactor leftover.
+ */
+body { margin: 0; font-family: sans-serif; }
+.promo-banner { display: flex; align-items: center; gap: 12px; padding: 10px 16px; background-color: #fff3bf; }
+.promo-text { margin: 0; flex: 1; }
+.close-btn { border: none; background-color: transparent; font-size: 20px; cursor: pointer; padding: 4px 8px; }
+.close-icon { display: none; }
+.page { padding: 24px; }

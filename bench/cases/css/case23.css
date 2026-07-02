@@ -1,0 +1,7 @@
+/* case23.css — seeded bug: `transition: opacity` on .card names the property
+ * but omits the duration, which therefore stays at its 0s initial value — the
+ * classic forgotten-duration typo. The opacity flip is instant by design.
+ */
+body { font-family: sans-serif; margin: 0; padding: 24px; background-color: #f8f9fa; }
+.card { opacity: 0; transition: opacity; width: 320px; padding: 16px; background-color: #ffffff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15); }
+.card.visible { opacity: 1; }

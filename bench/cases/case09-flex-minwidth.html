@@ -1,8 +1,8 @@
 <!doctype html>
 <!-- SEEDED BUG: flex item not shrinking — the first .cell contains an unbreakable
      nowrap SKU string; with the implicit min-width:auto of flex items it cannot
-     shrink below its content, so the 480px .row overflows. EXPECTED_FAIL: the
-     engine has no min-width:auto diagnostic yet (see bench/manifest.json). -->
+     shrink below its content, so the 480px .row overflows. The v0.3 flex
+     diagnostic in engine/ancestors.ts names the trap and marks it [BINDING]. -->
 <html lang="en">
 <head>
   <meta charset="utf-8">

@@ -1,0 +1,25 @@
+<!doctype html>
+<!-- SEEDED BUG (flagship, SPEC §14.5): the hide-sidebar handler adds .collapsed —
+     starting the 300ms width transition declared in css/case21.css — then a
+     premature 100ms "cleanup" timeout sets display:none while the transition
+     is still running (js/case21-sidebar.js). display removes the box and
+     cancels the transition mid-flight: the sidebar starts sliding, then jumps
+     away. record_interaction on the button must name the CANCELLED transition,
+     the display change, and the handler file. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Bench case 21 — display:none kills the hide-sidebar transition</title>
+  <link rel="stylesheet" href="css/case21.css">
+</head>
+<body>
+  <div class="toolbar">
+    <button class="toggle" type="button">Hide sidebar</button>
+  </div>
+  <div class="layout">
+    <aside class="sidebar"><h2>Sidebar</h2><p>navigation links</p></aside>
+    <main class="content"><h1>Content</h1><p>main area that shifts left when the sidebar hides</p></main>
+  </div>
+  <script src="js/case21-sidebar.js"></script>
+</body>
+</html>

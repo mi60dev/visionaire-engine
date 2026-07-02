@@ -1,7 +1,8 @@
 /* case09.css — seeded bug: a flex item refuses to shrink below its content size
  * (implicit min-width:auto) — the unbreakable SKU string keeps the first .cell
  * wider than the 480px row, overflowing it. No culprit line is asserted: the
- * engine cannot yet name this cause (expected_fail in bench/manifest.json).
+ * cause is the spec-implied minimum, not an authored declaration; the markers
+ * assert the engine/ancestors.ts flex-trap diagnostic instead.
  */
 body { font-family: sans-serif; margin: 0; padding: 24px; }
 .row { display: flex; width: 480px; gap: 12px; background-color: #f1f3f5; }

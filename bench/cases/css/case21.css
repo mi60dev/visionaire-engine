@@ -1,0 +1,10 @@
+/* case21.css — the width transition that SHOULD slide the sidebar shut.
+ * No culprit CSS line is asserted by the manifest: the CSS is correct; the bug
+ * is the display:none the JS handler applies mid-transition (case21-sidebar.js).
+ */
+body { margin: 0; font-family: sans-serif; }
+.toolbar { padding: 10px; }
+.layout { display: flex; }
+.sidebar { width: 280px; transition: width 300ms ease; overflow: hidden; flex: none; background-color: #dce3ea; min-height: 200px; }
+.sidebar.collapsed { width: 0px; }
+.content { flex: 1; background-color: #f7f7f7; min-height: 200px; padding: 8px; }

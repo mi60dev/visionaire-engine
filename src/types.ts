@@ -49,6 +49,8 @@ export interface ToolContext {
   cdp: CDPSession
   uids: UidRegistryLike
   sheets: StylesheetRegistryLike
+  /** JS attribution registry (SPEC §14.1); wired at connect. Optional so pre-v0.3 stubs compile — tools must error helpfully when absent. */
+  scripts?: ScriptRegistryLike
 }
 
 /**
@@ -361,4 +363,100 @@ export const COMPUTED_WHITELIST = [
 /** Rough token estimate used by all budgeted renderers. */
 export function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4)
+}
+
+// ───────────────────────── Time dimension (SPEC §14) ─────────────────────────
+
+export interface ScriptInfo {
+  scriptId: string
+  url: string
+  sourceMapURL?: string
+  embedderName?: string
+}
+
+/** A script position resolved for humans: 1-based, source-mapped when possible, WP-labeled. */
+export interface ResolvedScriptPos {
+  url: string
+  line: number
+  column: number
+  functionName?: string
+  authored?: AuthoredPos
+  /** Origin label via the WP lens, e.g. "plugin: some-slider" — empty for non-WP scripts. */
+  originLabel?: string
+}
+
+export interface ScriptRegistryLike {
+  /** Subscribe to Debugger.scriptParsed; session enables Debugger. Clears on navigation. */
+  attach(cdp: CDPSession): Promise<void>
+  get(scriptId: string): ScriptInfo | undefined
+  /** CDP positions are 0-based; result is 1-based. Resolves JS source maps with caching. */
+  resolvePosition(scriptId: string, line: number, column: number): Promise<ResolvedScriptPos | undefined>
+  clear(): void
+}
+
+export interface ListenerInfo {
+  eventType: string
+  capture: boolean
+  passive: boolean
+  once: boolean
+  location?: ResolvedScriptPos
+  /** Set when the handler belongs to a known delegation framework (react-dom, jquery, vue). */
+  delegatedBy?: string
+  /** uid of the node carrying the listener ('document'/'window' as pseudo-uids for those targets). */
+  ownerUid: string
+}
+
+/** One entry from the in-page element.getAnimations() census — SPEC §14.3. */
+export interface AnimationCensusEntry {
+  kind: 'CSSTransition' | 'CSSAnimation' | 'WebAnimation'
+  /** transitionProperty for transitions, animationName for CSS animations, id/empty for WAAPI. */
+  name: string
+  playState: string
+  currentTimeMs: number | null
+  durationMs: number
+  delayMs: number
+  easing: string
+  iterations: number | 'infinite'
+  fill: string
+  /** Longhand properties this animation touches (from getKeyframes). */
+  properties: string[]
+}
+
+/** A finding from the closed "not smooth" ruleset (R1–R6) — SPEC §14.3. */
+export interface AnimationFinding {
+  rule: 'non-animatable' | 'auto-dimension' | 'main-thread' | 'no-transition' | 'reduced-motion' | 'raf-blindness'
+  property?: string
+  reason: string
+  fixHint?: string
+}
+
+export type TimelineEventKind =
+  | 'action'
+  | 'handler'
+  | 'attribute-change'
+  | 'node-inserted'
+  | 'node-removed'
+  | 'text-change'
+  | 'animation-started'
+  | 'animation-cancelled'
+  | 'layout-shift'
+  | 'console-error'
+  | 'exception'
+  | 'coalesced'
+
+/** One line of the record_interaction causal timeline — SPEC §14.4. */
+export interface TimelineEvent {
+  /** Milliseconds since the action, best-effort (CDP DOM events carry no timestamps — arrival order is authoritative). */
+  tMs?: number
+  kind: TimelineEventKind
+  /** uid of the affected element when known. */
+  uid?: string
+  /** Human line fragment, e.g. "class +collapsed" or "width transition started (300ms ease)". */
+  summary: string
+  /** Source attribution when available. */
+  source?: ResolvedScriptPos
+  /** Honesty note when attribution is partial, e.g. "creation stacks cover insertions only". */
+  attributionNote?: string
+  /** For 'coalesced': how many similar events this line stands for. */
+  count?: number
 }

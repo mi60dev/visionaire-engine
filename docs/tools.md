@@ -1,6 +1,6 @@
 # Tool reference
 
-Visionaire Engine exposes 13 MCP tools: three session tools (`connect`, `navigate`, `set_viewport`) and ten inspection tools. All output is plain text (plus one PNG for `annotated_screenshot`), deterministic, and token-budgeted. Concepts and vocabulary come from [../SPEC.md](../SPEC.md); this page documents the tools as implemented.
+Visionaire Engine exposes 16 MCP tools: three session tools (`connect`, `navigate`, `set_viewport`) and thirteen inspection tools — ten for the frozen moment (what the page looks like and why) and three for the time dimension (`get_listeners`, `explain_animations`, `record_interaction` — what happens and why, SPEC §14). All output is plain text (plus one PNG for `annotated_screenshot`), deterministic, and token-budgeted. Concepts and vocabulary come from [../SPEC.md](../SPEC.md); this page documents the tools as implemented.
 
 ## Targeting elements
 
@@ -303,7 +303,7 @@ Walk the ancestor chain (self → root) for one concern, printing one compact li
 | `uid` / `selector` / `x`+`y` | TargetSpec | required (one) | Which element |
 | `concern` | `'width' \| 'height' \| 'position' \| 'overflow' \| 'stacking'` | `'width'` | Which constraint chain to report |
 
-Per concern the summary shows: **width/height** — `width`/`max-width`/`min-width`, `box-sizing`, paddings, non-block display, `flex-basis` for flex items, explicit inline `style="width: …"`; **position** — `position`, non-auto insets, `z-index`, and `transform:set (containing block)` (a transformed ancestor is the containing block even for `position:fixed`); **overflow** — `overflow`, `clip-path`, `contain`, `content-visibility`; **stacking** — `z-index`, `position`, and the stacking-context creator reason per SPEC §6.4.
+Per concern the summary shows: **width/height** — `width`/`max-width`/`min-width`, `box-sizing`, paddings, non-block display, `flex-basis` for flex items, explicit inline `style="width: …"`, and the flex min-size trap: a row flex item whose implicit `min-width: auto` is what makes its row overflow renders `min-width:auto (flex item) — prevents shrinking below content` (column direction gets the `min-height` analog); **position** — `position`, non-auto insets, `z-index`, and `transform:set (containing block)` (a transformed ancestor is the containing block even for `position:fixed`); **overflow** — `overflow`, `clip-path`, `contain`, `content-visibility`; **stacking** — `z-index`, `position`, and the stacking-context creator reason per SPEC §6.4.
 
 **Output** — real examples:
 
@@ -322,7 +322,19 @@ e2 <body> z-index:auto
 e3 <html> z-index:auto root stacking context [BINDING]
 ```
 
-Identity lines follow the same `<tag#id.classes>` format as the other tools: the `#id` when the element has one, then up to 3 classes. `[BINDING]` marks the nearest qualifying *ancestor* (never the element itself). For `concern: 'stacking'`, when the element has a numeric z-index and its nearest stacking context is not the root, a closing note explains the trap: `note: z-index:9999 is scoped inside context created by e12 (transform) — it cannot escape that context`. Very deep chains are pruned to ~800 tokens, keeping self, the nearest ancestors, and always the root line, with `[N more ancestors pruned]`.
+And the flex min-size trap (a nowrap SKU string keeps the first cell of a 480px flex row from shrinking):
+
+```
+ancestors of e1 <div.cell> — concern: width (self → root)
+e1 <div.cell> width:567.406px min-width:auto (flex item) — prevents shrinking below content padding-x:8px flex-basis:0% [BINDING]
+e2 <div.row> width:480px display:flex
+e3 <body> width:1232px padding-x:24px
+e4 <html> width:1280px
+```
+
+The trap fires only when all of it is true: the parent is a row-direction flex container, the item's computed `min-width` is `auto` with `overflow: visible` (any other overflow value drops the automatic minimum to zero) and `flex-shrink > 0`, **and** the parent's content actually overflows its box — a healthy flex row never triggers it.
+
+Identity lines follow the same `<tag#id.classes>` format as the other tools: the `#id` when the element has one, then up to 3 classes. `[BINDING]` marks the nearest qualifying *ancestor* — the element itself can take it only for the flex min-size trap, where the shrink blocker genuinely lives on the element's own implicit minimum. For `concern: 'stacking'`, when the element has a numeric z-index and its nearest stacking context is not the root, a closing note explains the trap: `note: z-index:9999 is scoped inside context created by e12 (transform) — it cannot escape that context`. Very deep chains are pruned to ~800 tokens, keeping self, the nearest ancestors, and always the root line, with `[N more ancestors pruned]`.
 
 ## find_elements
 
@@ -460,6 +472,89 @@ In a headless session the tool still runs (synthetic `Input.dispatchMouseEvent` 
 warning: headless session — no human can see this tab to click in it (synthetic Input.dispatchMouseEvent clicks still work); use connect { headless: false } for a real picker.
 ```
 
+## get_listeners
+
+The bridge from "this button" to "this JS file": every event listener on an element — and, by default, on its ancestor chain up through `document` and `window`, because delegated handlers live up the tree — with the handler's file:line (source-mapped when possible, WordPress-labeled like CSS attributions) and the flags that cause real bugs: `capture`, `passive` (`preventDefault` silently ignored!), `once`. Use it when a click/hover/input "does nothing", when you need to know which script owns a behavior before editing, or before `record_interaction` to know what a click will run. An **empty answer is an answer**: no click listener on the element or anywhere above it means nothing on the page reacts to that click — the handler is missing or attached to the wrong element.
+
+| Parameter | Type | Default | Meaning |
+|---|---|---|---|
+| `uid` / `selector` / `x`+`y` | TargetSpec | required (one) | Which element |
+| `eventType` | string | all types | Filter to one event type, e.g. `"click"` |
+| `includeAncestors` | boolean | `true` | Also report listeners up the ancestor chain, `document`, and `window` |
+
+**Output** — real examples (bench cases 21/22 fixtures). A button with a direct handler:
+
+```
+listeners on e1 <button.toggle> "Hide sidebar"
+  click → hideSidebar @ …/js/case21-sidebar.js:10  [line]
+ancestors:
+  (none up the chain — document and window included)
+```
+
+And the honest absence — the close handler was attached to a hidden sibling, so the visible button has nothing:
+
+```
+listeners on e1 <button.close-btn> "×" — click only
+  (none for click on the element itself — delegated handlers may live on the ancestors below)
+ancestors (click):
+  (none up the chain — document and window included)
+```
+
+Listener lines read `type → handlerName @ file:line  [granularity | origin]  (flags)`. Handler names are recovered from script source (anonymous/arrow handlers render as plain `handler`; inline `onclick="…"` attributes render as `inline onclick attribute`). Flags appear only when non-default — except `passive`, which is always spelled out for scroll-blocking events (`wheel`, `touchstart`, `touchmove`). **Delegation honesty rule** (SPEC §14.2): a handler whose script is a known delegation framework is labeled `delegated (react-dom)` / `(jquery)` / `(vue)` with a closing note that the component-level handler is not resolvable at the DOM level — read the component source; the tool never pretends to find the JSX handler.
+
+## explain_animations
+
+Animations and transitions touching one element, both halves deterministic: what is animating **now** (an in-page `getAnimations()` census — type, play state, timing, animated properties) and what is **declared** even when idle (the winning `transition`/`animation` declarations and `@keyframes`, attributed to file:line through the same cascade + origin machinery as `explain_styles`). On top of both sits a closed "not smooth" ruleset (SPEC §14.3): non-animatable properties in `transition-property` (R1), the `width`/`height: auto` interpolation trap (R2), main-thread (layout/paint) jank risk for properties outside transform/opacity/filter (R3), missing or zero-duration transitions — "changes are instant by design" (R4), active `prefers-reduced-motion` (R5), and the rAF-blindness honesty note when the census is empty (R6). Use it when something "pops instead of fading", stutters, or never animates at all.
+
+| Parameter | Type | Default | Meaning |
+|---|---|---|---|
+| `uid` / `selector` / `x`+`y` | TargetSpec | required (one) | Which element |
+| `property` | string | — | CSS property you *expected* to animate — arms the R4 "changes are instant" check for it |
+
+**Output** — real example (bench case 23: `transition: opacity` with the duration forgotten, `property: "opacity"`):
+
+```
+animations on e1 <div.card.visible>
+active now: none
+declared:
+  transition: opacity — 0s ease  → cases/css/case23.css:6  [line | 127.0.0.1:49836 — edit this file]
+findings:
+  ⚠ transition-property covers 'opacity' but its transition-duration is 0s — changes are instant by design — fix: set a non-zero transition-duration for it
+notes:
+  - no active animations in the getAnimations() census — JS requestAnimationFrame animations are invisible to this census — use record_interaction to observe the change happening
+```
+
+`active now:` lists running animations with play state and timing; `declared:` carries the file:line + honesty-ladder bracket per declaration; each `findings:` line is one rule hit with a fix hint. Compositor status in v0.3 is the static R3 classification — authoritative trace-based failure reasons are a v0.4 item. Animations created purely from JS (`requestAnimationFrame` loops) are invisible to the census by nature; the R6 note says so explicitly and points at `record_interaction`.
+
+## record_interaction
+
+One interaction, one source-attributed causal timeline. The tool performs (or watches) a single interaction and records what happened — handler dispatch, DOM mutations, transitions starting/being cancelled, layout shifts, console errors — each line time-stamped, uid-keyed, and attributed to file:line where the platform provides attribution (SPEC §14.4). It is built on Chrome's own passively-computed signals (Long Animation Frames script attribution, `layout-shift` sources, creation stack traces for inserted nodes) merged with the CDP Animation and DOM event streams — **not** a bespoke mutation tracer, and never a debugger pause (pausing mid-interaction would cancel the very animations under investigation). Use it for "the animation isn't smooth", "clicking does something weird", or any bug you can only see *while it happens*.
+
+| Parameter | Type | Default | Meaning |
+|---|---|---|---|
+| `uid` / `selector` / `x`+`y` | TargetSpec | required for `click`/`hover` | What to interact with |
+| `action` | `'click' \| 'hover' \| 'manual'` | `'click'` | `manual` waits `waitMs` while a human performs the interaction in the headed tab (pairs with `pick_element`) |
+| `waitMs` | number | `1500` (clamped 200–10000) | How long to keep recording after the action |
+| `maxEvents` | number | `40` | Hard cap on timeline lines; similar sibling mutations are coalesced first |
+
+**Output** — real example (the flagship bench case 21: a hide-sidebar handler starts a width transition, then a premature cleanup timeout sets `display:none` mid-flight):
+
+```
+interaction: click on e1 <button.toggle> "Hide sidebar"  (recorded 1500ms, 10 events)
+t=0     click → handler hideSidebar @ js/case21-sidebar.js:10
+t=95ms  layout shift 0.02 — main.content moved 114px left
+t=95ms  e2 <aside.sidebar> class +collapsed  (mutation attribution unavailable; likely by js/case21-sidebar.js:10 (hideSidebar) — only script running in that frame)
+t=95ms  transition started on e2: width 300ms ease
+t=98ms  layout shift 0.00 — main.content moved 16px left
+t=107ms layout shift 0.00 — main.content moved 17px left
+t=115ms layout shift 0.00 — main.content moved 14px left
+t=116ms e2 <aside.sidebar.collapsed> inline style changed → "display: none;"  (mutation attribution unavailable; likely by js/case21-sidebar.js:10 (hideSidebar) — only script running in that frame)
+t=122ms layout shift 0.03 — main.content moved 119px left
+t=123ms ✗ transition CANCELLED on e2 (width) — a style/display change removed it mid-flight. That is the jump.
+```
+
+Honesty notes are part of the format: CDP DOM events carry no timestamps, so `t=` offsets are best-effort and arrival order is authoritative; creation stacks cover node *insertions* only, so attribute/class mutations are labeled `(mutation attribution unavailable …)` — softened to "likely `script:line`" when exactly one script ran in that frame; LoAF script attribution names the entry-point function of same-origin scripts, not the whole call chain. Everything the recording window enables (mutation events, creation stacks, the Animation domain, the in-page `PerformanceObserver` buffer) is torn down when the tool returns, success or error.
+
 ---
 
 ## Recommended debugging flow
@@ -468,6 +563,7 @@ warning: headless session — no human can see this tab to click in it (syntheti
 2. **Orient: `page_snapshot`** — get the uid-keyed tree. If the user described an element in words, ground it with **`find_elements`** (`{ text: "Get started" }`); if you are working from a screenshot or a coordinate, use **`annotated_screenshot`** / **`node_at_point`**; if a human is looking at the tab and offers to point, **`pick_element`** lets them click the element directly. On WordPress or an unfamiliar stack, run **`page_origins`** once so you know what you will be attributing against (and whether an optimizer bundle needs bypassing).
 3. **What: `inspect_element`** — confirm the rendered reality: visibility verdict, real box, computed → used pairs. If the element is constrained/clipped/stacked by something above it, **`inspect_ancestors`** with the matching concern names the binding ancestor.
 4. **Why: `explain_styles`** — usually with `property:` once you know what is wrong (`{ uid: "e5", property: "margin-bottom" }`). The WINNER's `→ file:line [granularity | origin — edit hint]` is the edit target; check the notes for INACTIVE declarations and `@media`/`@layer` context before editing.
-5. **Verify: `style_diff`** — `{ uid: "e5", mode: "record" }`, apply the fix, `navigate` to reload (uids go stale, but the slot re-resolves by selector), then `{ mode: "compare" }`. The diff should contain exactly the properties you meant to change — nothing missing, nothing extra.
+5. **When the bug only happens on interaction** — "clicking does nothing" starts at **`get_listeners`** (who owns this event, or the honest "nobody does"); "it doesn't animate right" starts at **`explain_animations`** (`property:` set to what you expected to move); and when the static answers don't explain it, **`record_interaction`** on the trigger element captures the causal timeline of the interaction itself.
+6. **Verify: `style_diff`** — `{ uid: "e5", mode: "record" }`, apply the fix, `navigate` to reload (uids go stale, but the slot re-resolves by selector), then `{ mode: "compare" }`. The diff should contain exactly the properties you meant to change — nothing missing, nothing extra. For a behavioral fix, re-run `record_interaction` instead and compare timelines.
 
 Related reading: [architecture.md](architecture.md) (how the deterministic pipeline works), [wordpress.md](wordpress.md) (origin resolution details), [../SPEC.md](../SPEC.md) (the authoritative spec).

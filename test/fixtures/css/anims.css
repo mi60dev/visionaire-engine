@@ -1,0 +1,27 @@
+/* anims.css — animations.html e2e fixture.
+ * LINE NUMBERS ARE LOAD-BEARING: test/animations.e2e.test.ts asserts the marked lines.
+ * Keep each marked construct on its marked line; do not shift lines.
+ */
+
+/* line 7 — @keyframes spin header: e2e asserts "anims.css:7" for the keyframes attribution */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* line 13 — the spinner animation declaration (census: CSSAnimation 'spin', running) */
+#spinner { animation: spin 1.2s linear infinite; width: 40px; height: 40px; }
+
+/* line 16 — the auto-height trap: transition covers height but height stays auto (R2) */
+.box { transition: height 300ms ease; }
+
+/* line 19 — clean compositor-friendly hover transition: zero warning findings */
+#slide { transition: transform 200ms ease-out; display: inline-block; }
+#slide:hover { transform: translateX(24px); }
+
+/* line 23 — reduced-motion-ignoring animation: no prefers-reduced-motion guard (R5) */
+#pulse { animation: pulse 1s ease-in-out infinite; }
+@keyframes pulse {
+  from { opacity: 1; }
+  to { opacity: 0.4; }
+}

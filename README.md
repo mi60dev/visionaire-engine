@@ -4,7 +4,7 @@
 
 An MCP server that gives LLMs deterministic "rendering truth" about live web pages, so they can debug CSS, design, and WordPress issues instead of guessing from screenshots.
 
-**Status: v0.2.** 13 tools, 125 tests (102 unit + 23 end-to-end on real Chrome) plus a 20-case seeded-bug benchmark (`npm run bench`), verified live against wordpress.org.
+**Status: v0.3.** 16 tools, 171 tests (121 unit + 50 end-to-end on real Chrome) plus a 23-case seeded-bug benchmark (`npm run bench`), verified live against wordpress.org. New in v0.3: the time dimension — event-listener attribution, animation diagnosis, and source-attributed interaction timelines.
 
 ## The problem
 
@@ -56,7 +56,7 @@ npm run demo                                              # bundled fixture
 npm run demo -- https://wordpress.org --selector "a.wp-block-button__link"
 ```
 
-## The 13 tools
+## The 16 tools
 
 | Tool | Purpose |
 |---|---|
@@ -69,6 +69,9 @@ npm run demo -- https://wordpress.org --selector "a.wp-block-button__link"
 | `find_elements` | Deterministic search by text, selector, role, or screen region |
 | `node_at_point` | x,y → element uid + ancestor chain |
 | `pick_element` | Human-in-the-loop grounding: DevTools-style hover highlight, the user clicks the element that looks wrong |
+| `get_listeners` | Event listeners on an element + its ancestors, with handler file:line and capture/passive/once flags |
+| `explain_animations` | Animations/transitions touching an element: live census, declared rules with file:line, and a closed "why is it not smooth" ruleset |
+| `record_interaction` | One interaction → a source-attributed causal timeline: handlers, mutations, cancelled transitions, layout shifts |
 | `annotated_screenshot` | Screenshot with numbered marks that equal snapshot uids |
 | `style_diff` | Record styles, compare later — verify-my-fix loops |
 

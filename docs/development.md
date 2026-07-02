@@ -33,7 +33,7 @@ CDP protocol types come from `puppeteer-core` (SPEC §10) — there is no separa
 git clone <repo> && cd visionaire-engine
 npm install
 npm run build     # tsc → dist/
-npm test          # 125 tests; e2e part auto-skips without Chrome
+npm test          # 171 tests; the e2e part auto-skips without Chrome
 ```
 
 ## Commands
@@ -41,9 +41,9 @@ npm test          # 125 tests; e2e part auto-skips without Chrome
 | Command | What it runs | Notes |
 |---|---|---|
 | `npm run build` | `tsc -p tsconfig.json` | Emits `dist/` with declarations + source maps. `dist/index.js` is the `bin` entry. |
-| `npm test` | `vitest run` | All 5 test files. 60 s test/hook timeouts (browser startup headroom). |
+| `npm test` | `vitest run` | All 9 test files. 60 s test/hook timeouts (browser startup headroom). |
 | `npm run dev` | `tsx src/index.ts` | The MCP server from source, on stdio. It waits for an MCP client on stdin — see [Registering with MCP clients](#registering-with-mcp-clients) before wiring it up. |
-| `npm run bench` | `tsx bench/run.ts` | The 20-case seeded-bug benchmark on real headless Chrome — see [Benchmark](#benchmark). |
+| `npm run bench` | `tsx bench/run.ts` | The 23-case seeded-bug benchmark on real headless Chrome — see [Benchmark](#benchmark). |
 | `npm run demo` | `tsx scripts/demo.ts` | CLI loop with no MCP client needed — see below. |
 
 ### The demo
@@ -104,20 +104,32 @@ client, no build step (tsx runs TypeScript directly).
 
 ## Tests
 
-Five files, 125 tests total (102 pure unit + 23 e2e):
+Nine files, 171 tests total (121 pure unit + 50 e2e):
 
 | File | Tests | Browser? | What it covers |
 |---|---|---|---|
 | `test/cascade.test.ts` | 46 | no | `computeCascade` + the specificity parser, on hand-built `CSS.getMatchedStylesForNode` payloads: specificity vs order, `!important` flips, inline vs `!important`, shorthand expansion, inherited proximity, `@layer`. |
 | `test/inactive.test.ts` | 16 | no | The inactive-declaration rule table (`findInactiveDeclarations`). |
 | `test/wordpress.test.ts` | 40 | no | The WP detection table (`resolveWpOrigin`), origin rendering (`wpOriginToStyleOrigin`), minified-sheet degradation (`StylesheetRegistry.classify`), and page-level `detectPlatform` — all on plain metadata objects. |
+| `test/animations.test.ts` | 19 | no | The closed "not smooth" ruleset R1–R6 (`engine/animations.ts`) on constructed census/computed/declaration inputs. |
 | `test/e2e.test.ts` | 21 | **real headless Chrome** | Drives the ToolDefs directly (`handler(ctx, args)`, not the MCP transport) against `test/fixtures/*.html`. |
 | `test/pick.e2e.test.ts` | 2 | **real headless Chrome** | `pick_element`: synthetic-click happy path and the timeout path (proves inspect mode really exits). |
+| `test/listeners.e2e.test.ts` | 10 | **real headless Chrome** | `get_listeners` against `fixtures/listeners.html`: direct handlers with file:line, inline `onclick` attributes, delegation labeling, passive/once flags, ancestor/document/window walk. |
+| `test/animations.e2e.test.ts` | 5 | **real headless Chrome** | `explain_animations` against `fixtures/animations.html`: the live census, declared `@keyframes`/transition attribution, and the R-findings on real computed styles. |
+| `test/interaction.e2e.test.ts` | 12 | **real headless Chrome** | `record_interaction` against `fixtures/sidebar.html`, served over a local `node:http` server (LoAF script attribution is empty on `file://` pages): the cancelled-transition verdict, handler attribution, mutation/layout-shift lines, teardown. |
 
 The unit tests are pure functions over constructed data — they run in
-milliseconds and need no browser. Both e2e files wrap everything in
+milliseconds and need no browser. The e2e files wrap everything in
 `describe.skipIf(!chromePath)`, so `npm test` still passes (with the e2e files
 skipped) on machines without Chrome.
+
+Note for anything driving CDP: since v0.3 the session enables the **Debugger
+domain at connect** (the ScriptRegistry listens to `Debugger.scriptParsed` for
+JS file:line attribution). Enabling Debugger makes page-side `debugger;`
+statements real, so `session.ts` immediately follows every enable with
+`Debugger.setSkipAllPauses` — the skip flag does not survive a
+disable/enable toggle (verified empirically), which is why the navigation
+resync re-sets it too.
 
 ### Fixture line numbers are load-bearing
 
@@ -163,34 +175,40 @@ under `bench/cases/` seeds exactly **one** known visual bug a real developer
 would report ("the subscribe button has too much space under it").
 `bench/manifest.json` records, per case: the user-phrased symptom, the target
 element, which tool should reveal the cause (`explain_styles` |
-`inspect_element` | `inspect_ancestors`), the tool args, and the `expected`
+`inspect_element` | `inspect_ancestors` | `get_listeners` |
+`explain_animations` | `record_interaction`), the tool args, and the `expected`
 substrings that must ALL appear in the tool output for a pass. Markers are
 chosen to prove the engine named the **true cause** — the winning `file:line`,
-`lost (specificity)`, `occluded by`, `[BINDING]` — never incidental strings or
-full formatted lines (those are cosmetic and may be reworded).
+`lost (specificity)`, `occluded by`, `[BINDING]`, `CANCELLED` — never
+incidental strings or full formatted lines (those are cosmetic and may be
+reworded).
 
 ```bash
-npm run bench             # all 20 cases (~5 s on real headless Chrome)
+npm run bench             # all 23 cases (~5 s on real headless Chrome)
 npx tsx bench/run.ts      # the same, without the npm script
 npx tsx bench/run.ts 11   # a single case by manifest id
 ```
 
-The runner launches one headless `SessionManager`, navigates to each `file://`
-fixture, and drives the named ToolDef handler directly (`handler(ctx, args)`,
-like the e2e suite). It prints a per-case table — id, status, tool-output
-tokens, and the tokens of one `page_snapshot` per case (the census an agent
-would realistically spend to find the element), reported separately — then a
-summary line: `N/20 pass, median context tokens X`. Failed cases print their
-missing markers plus the full tool output. Exit code 1 on any FAIL, so it is
-CI-usable.
+The runner launches one headless `SessionManager`, navigates to each fixture,
+and drives the named ToolDef handler directly (`handler(ctx, args)`, like the
+e2e suite). Fixtures load from `file://` by default; a case with
+`"serve": "http"` in the manifest is served from a local `node:http` static
+server instead — the v0.3 time-dimension cases need a real origin, because
+LoAF script attribution is empty on `file://` pages (SPEC §14). The runner
+prints a per-case table — id, status, tool-output tokens, and the tokens of
+one `page_snapshot` per case (the census an agent would realistically spend to
+find the element), reported separately — then a summary line: `N/23 pass,
+median context tokens X`. Failed cases print their missing markers plus the
+full tool output. Exit code 1 on any FAIL, so it is CI-usable.
 
 ### Adding a case
 
 1. Create `bench/cases/caseNN-<slug>.html` with its CSS under
-   `bench/cases/css/`. WordPress-flavored cases put sheets under
-   `bench/cases/wp-content/{themes,plugins}/…` so the URL-convention resolver
-   (SPEC §7.3) fires. Seed exactly one bug and state it in a comment at the top
-   of the page.
+   `bench/cases/css/` and any JS under `bench/cases/js/`. WordPress-flavored
+   cases put sheets under `bench/cases/wp-content/{themes,plugins}/…` so the
+   URL-convention resolver (SPEC §7.3) fires. Behavioral cases that rely on
+   script attribution should set `"serve": "http"` in their manifest entry.
+   Seed exactly one bug and state it in a comment at the top of the page.
 2. Culprit-rule **line numbers are load-bearing**, same convention as
    `test/fixtures/css/`: comment-pad the CSS so the rule sits at the line the
    manifest asserts, and document that line in the file's header comment.
@@ -204,25 +222,27 @@ CI-usable.
 
 When the engine genuinely cannot name a cause yet, do **not** weaken a case to
 make it pass. Keep the ideal cause-proving markers and mark the manifest entry
-`"expected_fail": true` with a `"reason"` naming the missing engine capability
-(case 9 — the implicit `min-width:auto` of flex items — is the current
-example). The runner reports such cases as XFAIL, not FAIL, and they do not
-affect the exit code. If the engine later learns to name the cause, the case
-flips to XPASS and the runner exits 1 with `XPASS: tighten the manifest` —
-remove `expected_fail` and firm up the markers.
+`"expected_fail": true` with a `"reason"` naming the missing engine capability.
+The runner reports such cases as XFAIL, not FAIL, and they do not affect the
+exit code. If the engine later learns to name the cause, the case flips to
+XPASS and the runner exits 1 with `XPASS: tighten the manifest` — remove
+`expected_fail` and firm up the markers. The lifecycle poster child is case 9
+(the implicit `min-width:auto` of flex items): XFAIL through v0.2, flipped by
+the v0.3 flex diagnostic in `engine/ancestors.ts`, markers then tightened to
+the full diagnostic phrase plus `[BINDING]`.
 
 ## Project layout
 
 ```
 src/
   index.ts          # bin entry: stdio transport, graceful shutdown
-  server.ts         # createServer(session) — registers all 13 tools; owns connect/navigate/set_viewport
-  session.ts        # SessionManager (launch/attach Chrome, CDP domains); findChromeExecutable()
+  server.ts         # createServer(session) — registers all 16 tools; owns connect/navigate/set_viewport
+  session.ts        # SessionManager (launch/attach Chrome, CDP domains incl. Debugger); findChromeExecutable()
   types.ts          # every shared contract, incl. ToolDef and COMPUTED_WHITELIST
   uid.ts            # UidRegistry + resolveTarget (uid | selector | x,y → node)
-  tools/            # ten ToolDefs, one file each (page-snapshot, explain-styles, …)
-  engine/           # pure deterministic engines: cascade, specificity, inactive, visibility, stacking, box-model, ancestors
-  attribution/      # stylesheets registry, sourcemaps, wordpress resolver
+  tools/            # thirteen ToolDefs, one file each (page-snapshot, explain-styles, record-interaction, …)
+  engine/           # pure deterministic engines: cascade, specificity, inactive, visibility, stacking, box-model, ancestors, animations
+  attribution/      # stylesheets registry, scripts registry, sourcemaps, wordpress resolver
   format/           # census + dossier renderers (token-budgeted plain text)
 scripts/demo.ts     # the CLI demo
 test/               # unit + e2e + fixtures (see above)
@@ -249,9 +269,10 @@ export interface ToolDef {
 }
 ```
 
-`ToolContext` gives you `{ page, cdp, uids, sheets }` — the puppeteer `Page`,
-a CDP session, the uid registry, and the stylesheet registry. `ToolResult` is
-`{ text, images? }`.
+`ToolContext` gives you `{ page, cdp, uids, sheets, scripts? }` — the puppeteer
+`Page`, a CDP session, the uid registry, the stylesheet registry, and (wired at
+connect since v0.3) the script registry for JS file:line attribution.
+`ToolResult` is `{ text, images? }`.
 
 1. **Create `src/tools/my-tool.ts`** following the existing pattern
    (`src/tools/node-at-point.ts` is the shortest real example):
@@ -511,12 +532,18 @@ Summarized from [../SPEC.md](../SPEC.md) §13:
 
 - **v0.1 (shipped):** the first 12 tools, Chromium launch/attach,
   WordPress convention mode (zero WP cooperation).
-- **v0.2 (shipped, this codebase):** `pick_element` click-to-pick (the 13th
+- **v0.2 (shipped):** `pick_element` click-to-pick (the 13th
   tool, via `Overlay.setInspectMode`); the deterministic seeded-bug benchmark
   harness (`bench/`, run with `npm run bench`); minification-aware granularity
   degradation; census platform header.
-- **v0.3:** source-map hardening, deeper stacking/z-index explanations,
-  `@layer` verdict edge cases, `style_diff` across viewports.
+- **v0.3 (this codebase — the time dimension, SPEC §14):** `get_listeners`,
+  `explain_animations`, `record_interaction`; the ScriptRegistry (JS file:line
+  attribution through the WP origin lens); the flex `min-width:auto`
+  diagnostic (flipped bench case 9 from XFAIL to PASS).
+- **v0.4:** trace-based compositor-failure reasons (Lighthouse's
+  non-composited-animations enum decode); opt-in DOM-breakpoint attribution
+  for attribute mutations; source-map hardening; `@layer` verdict edge cases;
+  `style_diff` across viewports.
 - **v1.1:** a WordPress companion plugin (~6 Abilities on the official
   mcp-adapter, WP 6.9+) for enqueue-registry lookups, Elementor control
   resolution, and template-override detection.

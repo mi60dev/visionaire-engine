@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sidebar fixture — record_interaction (SPEC §14.4)</title>
+<style>
+  body { margin: 0; font-family: sans-serif; }
+  .toolbar { padding: 10px; }
+  .layout { display: flex; }
+  aside#sidebar {
+    width: 300px;
+    transition: width 300ms ease; /* sidebar.html:13 — the transition under test */
+    overflow: hidden;
+    flex: none;
+    background: #dce3ea;
+    min-height: 200px;
+  }
+  aside#sidebar.collapsed { width: 0px; } /* sidebar.html:19 */
+  main#content { flex: 1; background: #f7f7f7; min-height: 200px; padding: 8px; }
+  #content.highlight { background: #fff3bf; } /* no transition — instant by design */
+</style>
+</head>
+<body>
+<div class="toolbar">
+  <button id="btn-smooth">Toggle sidebar (smooth)</button>
+  <button id="btn-broken">Hide sidebar (broken)</button>
+  <button id="btn-instant">Highlight content (instant)</button>
+</div>
+<div class="layout">
+  <aside id="sidebar" class="sidebar"><h2>Sidebar</h2><p>navigation links</p></aside>
+  <main id="content"><h1>Content</h1><p>main area that shifts when the sidebar hides</p></main>
+</div>
+<script src="js/sidebar.js"></script>
+</body>
+</html>

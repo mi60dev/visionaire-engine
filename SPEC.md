@@ -64,6 +64,9 @@ When a user sees a visual problem in their browser and asks an LLM to fix it, th
 | 11 | `annotated_screenshot` | Screenshot with numbered marks == snapshot uids |
 | 12 | `style_diff` | Record styles for a target, later compare → deltas only (verify-my-fix loops) |
 | 13 | `pick_element` | Human-in-the-loop: DevTools-style hover highlight in the connected tab; the user clicks the broken element → uid |
+| 14 | `get_listeners` | Event handlers on an element (and its ancestors) with handler file:line — the bridge from "this button" to "this JS file" (§14.2) |
+| 15 | `explain_animations` | Animations/transitions touching an element: timing, file:line attribution, and a closed "why is it not smooth" ruleset (§14.3) |
+| 16 | `record_interaction` | Perform/observe one interaction and emit a source-attributed causal timeline of what happened (§14.4) |
 
 ### Tool specs
 
@@ -310,7 +313,65 @@ Conventions: ESM + NodeNext (**relative imports must use `.js` extension**), str
 
 ## 13. Roadmap
 - **v0.1 (shipped):** the first 12 tools, Chromium launch/attach, WP convention mode.
-- **v0.2 (this increment):** `pick_element` click-to-pick; the deterministic benchmark harness (`bench/`); minification-aware granularity degradation; census platform header.
-- **v0.3:** source-map hardening, stacking/z-index explainer depth, `@layer` verdict edge cases, style_diff across viewports.
+- **v0.2 (shipped):** `pick_element` click-to-pick; the deterministic benchmark harness (`bench/`); minification-aware granularity degradation; census platform header.
+- **v0.3 (this increment — the time dimension, §14):** `get_listeners`, `explain_animations`, `record_interaction`; ScriptRegistry (JS file:line attribution); the flex `min-width:auto` diagnostic (flips bench case 9).
+- **v0.4:** trace-based compositor-failure reasons (port Lighthouse's non-composited-animations enum decode); opt-in DOM-breakpoint attribution mode for attribute mutations; source-map hardening; `@layer` verdict edge cases; style_diff across viewports.
 - **v1.1:** WordPress companion plugin (~6 Abilities on the official mcp-adapter, WP 6.9+): enqueue registry, `_elementor_data` control resolution, Site-Editor template-override detection, staleness checks. Needs a live WP 6.9 test site.
 - **v1.2:** LLM-in-the-loop benchmark (does the context lift diagnosis accuracy — the marketing artifact); Firefox/BiDi investigation.
+
+## 14. The time dimension (v0.3)
+
+Everything before §14 explains a frozen moment. This section adds *what happened and why*, so "the hide-sidebar animation isn't smooth" becomes answerable. Design follows the July 2026 deep-research verdict:
+
+- **Platform-native attribution is the substrate.** Chrome already computes, without perturbation: which script ran in a slow frame with source position (Long Animation Frames API: `PerformanceScriptTiming.sourceURL/sourceFunctionName/sourceCharPosition/invoker`), which elements shifted (`layout-shift` entry `sources[]`), and which script created a node (`DOM.getNodeStackTraces`, gated by `DOM.setNodeStackTracesEnabled`). `record_interaction` merges and time-aligns these existing signals keyed to uids — it is NOT a bespoke mutation tracer and NOT built on rrweb (rrweb records *what* changed for visual replay, never *which script* caused it, and its MutationObserver capture perturbs the main thread).
+- **Passive capture only.** No DOM breakpoints in v0.3: pausing the main thread mid-interaction cancels/desyncs the very animations under investigation. An opt-in breakpoint mode is a documented v0.4 candidate.
+- **Attribution, not comprehension.** We name the handler/rule/mutation at file:line; the calling LLM reads the source. Framework internals (React re-render causes, component handler resolution) stay out of scope — delegated listeners are labeled honestly instead.
+- **ARIA-live-region output discipline:** delta-first, coalesced, urgency-aware, hard event cap. A busy page emits hundreds of events per interaction; raw dumps are a bug.
+
+### 14.1 Shared infra: ScriptRegistry (`attribution/scripts.ts`)
+Mirror of the StylesheetRegistry for JS. Session enables `Debugger` at connect; the registry listens to `Debugger.scriptParsed` (scriptId → url, sourceMapURL, embedderName) and clears on navigation (same resync discipline as sheets). API: `get(scriptId)`, `resolvePosition(scriptId, line, col)` → `{ url, line, col (1-based), authored? }` with JS source-map resolution (same `@jridgewell/trace-mapping` + caching pattern as CSS). Script URLs run through the existing WP origin lens: a handler at `/wp-content/plugins/some-slider/js/main.js:88` is labeled `[plugin: some-slider]` — the CSS attribution synergy, for free. `ToolContext` gains optional `scripts?: ScriptRegistryLike` (wired by session at connect; tools error helpfully if absent).
+
+### 14.2 `get_listeners` `{ ...TargetSpec, eventType?: string, includeAncestors?: boolean = true }`
+`DOM.resolveNode` → objectId → `DOMDebugger.getEventListeners`. Per listener: event type, handler location via ScriptRegistry (file:line, authored via source map, WP origin label), and the flags that cause real bugs: `capture`, `passive` (preventDefault silently ignored!), `once`. With `includeAncestors`, walk the ancestor chain + document + window, filtered to `eventType` when given — delegated handlers live up the tree. **Delegation honesty rule:** when a handler's script URL matches a known delegation framework (react-dom, jquery, vue), label it `delegated root listener (react-dom) — component handler not resolvable at the DOM level; read the component source` rather than pretending to find the JSX handler. Output:
+```
+listeners on e5 <button.toggle> "Hide sidebar"
+  click → toggleSidebar @ js/sidebar.js:42  [line | theme: astra-child]  (passive:false once:false)
+ancestors (click):
+  document → …/jquery.min.js:2  [file | plugin: some-slider — minified, no map]  delegated (jquery)
+```
+
+### 14.3 `explain_animations` `{ ...TargetSpec }`
+Two halves, both deterministic:
+1. **Census (active now):** in-page `element.getAnimations()` via `Runtime.callFunctionOn` — type (CSSTransition/CSSAnimation/WAAPI), `transitionProperty`/`animationName`, playState, currentTime, timing (duration/delay/easing/iterations/fill), animated properties from `effect.getKeyframes()`. Cheap; no Animation domain needed. CDP's Animation domain is used only inside `record_interaction` (its event stream), because it carries **zero source attribution** — that join is ours:
+2. **Declared (even when idle):** from the existing matched-styles machinery — the winning `transition`/`animation` declarations (existing cascade verdict → file:line → origin ladder) and `@keyframes` bodies via `getMatchedStylesForNode().cssKeyframesRules` (styleSheetId + SourceRange → same 3-hop attribution join).
+
+**Closed "not smooth" ruleset** (`engine/animations.ts`, pure functions over census + computed styles + declarations, unit-testable):
+- R1 non-animatable property in `transition-property` (`display` and other discrete properties) — "toggling display kills transitions on this element; use visibility/opacity or @starting-style"
+- R2 auto-dimension trap: transition covers `width`/`height` and the computed value is `auto` — "cannot interpolate to/from auto; it jumps"
+- R3 main-thread property: animated property not in {transform, opacity, filter, backdrop-filter} — "runs on the main thread (layout/paint); jank risk under load; prefer transform"
+- R4 no transition/zero duration on the property the user expects to animate — "changes are instant by design"
+- R5 `prefers-reduced-motion: reduce` is active and matched animations have no reduced-motion handling (informational)
+- R6 rAF blindness honesty: when the census is empty, say explicitly "JS requestAnimationFrame animations are invisible to this census — use record_interaction to observe the change happening"
+Compositor status in v0.3 is the static R3 classification; authoritative trace-based failure reasons (Lighthouse enum) are v0.4.
+
+### 14.4 `record_interaction` `{ ...TargetSpec?, action?: 'click'|'hover'|'manual' = 'click', waitMs?: number = 1500 (clamp 200–10000), maxEvents?: number = 40 }`
+One interaction, one causal timeline. Recording window (setup → act → collect for waitMs → teardown, all state restored in finally):
+1. `DOM.getDocument({depth:-1, pierce:true})` (CDP only emits mutation events for known nodes) + subscribe `DOM.attributeModified/childNodeInserted/childNodeRemoved/characterDataModified`
+2. `DOM.setNodeStackTracesEnabled(true)` — creation stacks for inserted nodes (recording window only; overhead is real)
+3. `Animation.enable` — `animationStarted/animationCanceled` events
+4. Injected page-side `PerformanceObserver` buffer: `long-animation-frame` (script attribution), `layout-shift` (sources), `event` (interaction latency); read once at teardown via one evaluate
+5. `Runtime.consoleAPICalled` (error/warn) + `exceptionThrown`
+Action: `Input.dispatchMouseEvent` at the target's center (`click`/`hover`), or `manual` — the tool waits `waitMs` while the human performs the interaction in the headed tab (pairs with `pick_element`).
+**Merge & narrate:** chronological, uid-keyed. Attribution joins: inserted node → `DOM.getNodeStackTraces` top frame → ScriptRegistry file:line; slow frame → LoAF script (`sourceURL:sourceCharPosition`, honesty note: entry-point function, same-origin only); shift → `layout-shift.sources` → uids + px deltas; `animationStarted` followed by `animationCanceled` for the same target/property within the window → explicit verdict line "transition cancelled — a style/display change removed it mid-flight". Attribute/class mutations have no creation-stack equivalent — label them `(mutation attribution unavailable — creation stacks cover node insertions only)` and, when exactly one LoAF script overlaps, add "likely by <script:line> (only script running in that frame)". Coalescing: collapse similar sibling mutations ("+18 similar attribute changes under e12"), cap at maxEvents with a truncation marker. Output:
+```
+interaction: click on e5 <button.toggle> "Hide sidebar"  (recorded 1500ms, 9 events, 3 coalesced)
+t=0     click → handler toggleSidebar @ js/sidebar.js:42  [line | theme: astra-child]
+t=2ms   e12 <aside.sidebar> class +collapsed
+t=3ms   transition started on e12: width 300ms ease  (declared at style.css:88)
+t=4ms   e12 attribute style="display:none"  (mutation attribution unavailable; likely sidebar.js:42 — only script in frame)
+t=4ms   ✗ transition CANCELLED on e12 (width) — the display change removed it mid-flight. That is the jump.
+t=6ms   layout shift 0.18 — e14 <main> moved 300px left
+```
+
+### 14.5 Testing & bench
+Fixtures: `sidebar.html` (working transition + broken display-kill variant + height:auto variant, one page, three buttons), `listeners.html` (direct handler, inline onclick, jQuery-style delegated, passive-listener case), `animations.html` (@keyframes, non-animatable transition, reduced-motion case). E2E per tool in separate files (`test/listeners.e2e.test.ts`, `test/animations.e2e.test.ts`, `test/interaction.e2e.test.ts`). Bench: +3 cases with `user_report` phrased as real complaints — the flagship being "the hide sidebar button doesn't hide the sidebar smoothly" expecting `record_interaction` to name the cancelled transition + the display mutation + the handler file:line. Plus: the flex `min-width:auto` shrink diagnostic (new inactive/ancestors rule) flips bench case 9 from XFAIL to PASS.

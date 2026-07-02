@@ -1,0 +1,26 @@
+<!doctype html>
+<!-- SEEDED BUG: the card's fade-in transition has no duration. `transition:
+     opacity` in css/case23.css leaves transition-duration at its 0s default,
+     so the opacity change applies instantly — the card pops instead of fading.
+     explain_animations on .card must flag the declared transition as instant
+     (the R4 "no transition / zero duration" finding, SPEC §14.3). -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Bench case 23 — fade-in pops (zero-duration transition)</title>
+  <link rel="stylesheet" href="css/case23.css">
+</head>
+<body>
+  <div class="card">
+    <h2>Welcome back</h2>
+    <p>This card is supposed to fade in when the page loads.</p>
+  </div>
+  <script>
+    // The intended entrance: reveal the card right after first paint. With the
+    // zero-duration transition it pops instead of fading.
+    requestAnimationFrame(function () {
+      document.querySelector('.card').classList.add('visible');
+    });
+  </script>
+</body>
+</html>

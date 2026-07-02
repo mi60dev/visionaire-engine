@@ -1,0 +1,26 @@
+<!doctype html>
+<!-- SEEDED BUG: the visible close button (.close-btn) has NO click listener.
+     A refactor replaced the old decorative .close-icon span with a real
+     <button>, but js/case22-banner.js still attaches the close handler to the
+     old span — which is now display:none, so nothing on the page reacts to the
+     click. get_listeners on .close-btn must honestly report the absence
+     (self AND ancestors) — that absence IS the diagnosis. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Bench case 22 — close handler attached to the wrong element</title>
+  <link rel="stylesheet" href="css/case22.css">
+</head>
+<body>
+  <div class="promo-banner">
+    <p class="promo-text">Spring sale — 20% off everything!</p>
+    <button class="close-btn" type="button" aria-label="Close">×</button>
+    <span class="close-icon" aria-hidden="true">×</span>
+  </div>
+  <main class="page">
+    <h1>Storefront</h1>
+    <p>Regular page content under the banner.</p>
+  </main>
+  <script src="js/case22-banner.js"></script>
+</body>
+</html>

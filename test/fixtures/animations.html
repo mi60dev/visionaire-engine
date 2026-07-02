@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Animations fixture</title>
+  <!-- All animation/transition rules live in the linked sheet so the e2e can
+       assert file:line attribution (anims.css line numbers are load-bearing). -->
+  <link rel="stylesheet" href="css/anims.css">
+</head>
+<body>
+  <!-- census case: infinite CSSAnimation, playState running whenever queried -->
+  <div id="spinner"></div>
+  <!-- R2 case: declares transition: height but its height stays auto -->
+  <div class="box" id="accordion"><p>auto-height content</p></div>
+  <!-- clean case: compositor-friendly transform transition, zero warnings -->
+  <a id="slide" href="#">clean transform hover</a>
+  <!-- R5 case: keeps pulsing even under prefers-reduced-motion: reduce -->
+  <div id="pulse">reduced-motion-ignoring pulse</div>
+</body>
+</html>

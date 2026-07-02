@@ -55,11 +55,15 @@ interface ChainFacts {
   inlineWidth: string
   inlineHeight: string
   parentDisplay: string
+  parentFlexDirection: string
+  parentOverflowsX: boolean
+  parentOverflowsY: boolean
 }
 
 const FACTS_FN = `function () {
   const read = (el, parent) => {
     const cs = getComputedStyle(el)
+    const pcs = parent ? getComputedStyle(parent) : null
     const g = (p) => cs.getPropertyValue(p)
     const r = el.getBoundingClientRect()
     return {
@@ -83,7 +87,10 @@ const FACTS_FN = `function () {
       mixBlendMode: g('mix-blend-mode'), willChange: g('will-change'),
       inlineWidth: el.style ? el.style.width : '',
       inlineHeight: el.style ? el.style.height : '',
-      parentDisplay: parent ? getComputedStyle(parent).display : '',
+      parentDisplay: pcs ? pcs.display : '',
+      parentFlexDirection: pcs ? pcs.flexDirection : '',
+      parentOverflowsX: parent ? parent.scrollWidth > parent.clientWidth + 1 : false,
+      parentOverflowsY: parent ? parent.scrollHeight > parent.clientHeight + 1 : false,
     }
   }
   const out = []
@@ -99,6 +106,33 @@ const CHAIN_FN = `function () {
 
 const isFlex = (display: string): boolean => /\bflex\b/.test(display)
 const isFlexOrGrid = (display: string): boolean => /\b(flex|grid)\b/.test(display)
+
+/**
+ * Implicit min-size trap of flex items (CSS Flexbox §4.5): a row flex item
+ * with min-width:auto cannot shrink below its content's min-content size, so
+ * the row overflows instead. Detectable purely from computed facts (verified
+ * empirically on real Chrome): computed min-width stays the literal 'auto' on
+ * flex items, and parent.scrollWidth exposes the row overflow even with
+ * overflow:visible. Guards: the automatic minimum only applies while the
+ * item's overflow is visible (any other value drops it to zero), and only an
+ * item that is allowed to shrink at all (flex-shrink > 0) has anything to
+ * blame on its minimum. Column analog below for min-height.
+ */
+const flexMinWidthTrap = (f: ChainFacts): boolean =>
+  isFlex(f.parentDisplay) &&
+  f.parentFlexDirection.startsWith('row') &&
+  f.minWidth === 'auto' &&
+  parseFloat(f.flexShrink) > 0 &&
+  f.overflowX === 'visible' &&
+  f.parentOverflowsX
+
+const flexMinHeightTrap = (f: ChainFacts): boolean =>
+  isFlex(f.parentDisplay) &&
+  f.parentFlexDirection.startsWith('column') &&
+  f.minHeight === 'auto' &&
+  parseFloat(f.flexShrink) > 0 &&
+  f.overflowY === 'visible' &&
+  f.parentOverflowsY
 
 function stackingMap(f: ChainFacts): Map<string, string> {
   return new Map([
@@ -126,6 +160,9 @@ function summarize(concern: AncestorConcern, f: ChainFacts, isRoot: boolean): st
       parts.push(`width:${f.width}`)
       if (f.maxWidth !== 'none') parts.push(`max-width:${f.maxWidth}`)
       if (f.minWidth !== '0px' && f.minWidth !== 'auto') parts.push(`min-width:${f.minWidth}`)
+      if (flexMinWidthTrap(f)) {
+        parts.push('min-width:auto (flex item) — prevents shrinking below content')
+      }
       if (f.boxSizing !== 'content-box') parts.push(`box-sizing:${f.boxSizing}`)
       if (f.paddingLeft !== '0px' || f.paddingRight !== '0px') {
         parts.push(
@@ -143,6 +180,9 @@ function summarize(concern: AncestorConcern, f: ChainFacts, isRoot: boolean): st
       parts.push(`height:${f.height}`)
       if (f.maxHeight !== 'none') parts.push(`max-height:${f.maxHeight}`)
       if (f.minHeight !== '0px' && f.minHeight !== 'auto') parts.push(`min-height:${f.minHeight}`)
+      if (flexMinHeightTrap(f)) {
+        parts.push('min-height:auto (flex item) — prevents shrinking below content')
+      }
       if (f.boxSizing !== 'content-box') parts.push(`box-sizing:${f.boxSizing}`)
       if (f.paddingTop !== '0px' || f.paddingBottom !== '0px') {
         parts.push(
@@ -203,13 +243,15 @@ function isBinding(concern: AncestorConcern, f: ChainFacts, isRoot: boolean): bo
       return (
         f.inlineWidth !== '' ||
         f.maxWidth !== 'none' ||
-        (isFlex(f.parentDisplay) && f.flexBasis !== 'auto')
+        (isFlex(f.parentDisplay) && f.flexBasis !== 'auto') ||
+        flexMinWidthTrap(f)
       )
     case 'height':
       return (
         f.inlineHeight !== '' ||
         f.maxHeight !== 'none' ||
-        (isFlex(f.parentDisplay) && f.flexBasis !== 'auto')
+        (isFlex(f.parentDisplay) && f.flexBasis !== 'auto') ||
+        flexMinHeightTrap(f)
       )
     case 'overflow':
       return f.overflowX !== 'visible' || f.overflowY !== 'visible'
@@ -275,8 +317,17 @@ export async function walkAncestors(
       const uid = ctx.uids.assign(described.backendNodeId, { tag, classes, attrId })
       const line: AncestorLine = { uid, tag, classes, summary: summarize(concern, f, isRoot) }
       if (attrId) line.attrId = attrId
-      // Binding constraint: nearest qualifying ANCESTOR (never self, i=0).
-      if (!bindingAssigned && i > 0 && isBinding(concern, f, isRoot)) {
+      // Binding constraint: nearest qualifying ANCESTOR (never self, i=0) —
+      // except the flex min-size trap, which genuinely lives on the element
+      // itself (its own implicit min-width/height:auto is the shrink blocker).
+      const selfBinds =
+        i === 0 &&
+        (concern === 'width'
+          ? flexMinWidthTrap(f)
+          : concern === 'height'
+            ? flexMinHeightTrap(f)
+            : false)
+      if (!bindingAssigned && (selfBinds || (i > 0 && isBinding(concern, f, isRoot)))) {
         line.binding = true
         bindingAssigned = true
       }
