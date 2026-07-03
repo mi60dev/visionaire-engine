@@ -9,6 +9,7 @@ import type {
   DeclarationInfo,
   ElementSummary,
   PropertyVerdict,
+  Specificity,
   ToolContext,
   ToolDef,
   ToolResult,
@@ -16,6 +17,7 @@ import type {
   WhyDossierInput,
 } from '../types.js'
 import { estimateTokens } from '../types.js'
+import { buildScopeNotes, collectScopeData } from '../engine/scope.js'
 import { pairAttributes, resolveTarget } from '../uid.js'
 import { computeCascade } from '../engine/cascade.js'
 import { findInactiveDeclarations } from '../engine/inactive.js'
@@ -263,6 +265,26 @@ async function explainStyles(ctx: ToolContext, args: Record<string, unknown>): P
   }
   const inactive = winnerDecls.length ? findInactiveDeclarations(winnerDecls, computed, parentDisplay) : []
 
+  // ── blast radius + scoped-fix suggestion (the "change THE button, not all buttons" section) ──
+  let scopeNotes: string[] = []
+  try {
+    const winnerSelectors: string[] = []
+    const winnerSpecs = new Map<string, Specificity | undefined>()
+    for (const v of attributed) {
+      const w = v.winner
+      if (!w || w.originType !== 'matched' || !w.selector) continue
+      if (!winnerSelectors.includes(w.selector)) {
+        winnerSelectors.push(w.selector)
+        winnerSpecs.set(w.selector, w.specificity)
+      }
+      if (winnerSelectors.length >= 4) break
+    }
+    const data = await collectScopeData(ctx, node.backendNodeId, winnerSelectors)
+    if (data) scopeNotes = buildScopeNotes(data, winnerSpecs)
+  } catch {
+    scopeNotes = [] // additive only
+  }
+
   // ── notes: @media/@layer context, verdict-uncertain, keyframes presence ──
   const keyframesNote = buildKeyframesNote(matched.cssKeyframesRules, filter, family)
   const notesFor = (included: AttributedVerdict[]): string[] => {
@@ -299,6 +321,7 @@ async function explainStyles(ctx: ToolContext, args: Record<string, unknown>): P
       )
     }
     if (keyframesNote) notes.push(keyframesNote)
+    notes.push(...scopeNotes)
     return notes
   }
 

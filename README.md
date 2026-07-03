@@ -6,7 +6,7 @@
 
 An MCP server that gives LLMs deterministic "rendering truth" about live web pages, so they can debug CSS, design, and WordPress issues instead of guessing from screenshots.
 
-**Status: v0.5.** 20 tools, 252 tests (145 unit + 107 end-to-end on real Chrome) plus a 24-case seeded-bug benchmark (`npm run bench`), verified live against wordpress.org. New in v0.5: `inject_css` — the live fix loop (trial a fix on the page, see what changed, converge, write source once) — and `navigate { bypassCache }` for stale-stylesheet hard reloads. v0.4 (field-report items): `interact` to drive the UI into a state and inspect it, `measure_element` for sub-pixel glyph/text-ink centering, and an `evaluate` escape hatch — plus element-scoped crops/zoom on `annotated_screenshot`, `match:"any"`/`visibleOnly:false` on `find_elements`, and zero-config cold-start Chrome discovery. v0.3 added the time dimension — event-listener attribution, animation diagnosis, and source-attributed interaction timelines. Hardened for untrusted pages (prompt-injection sanitization, fail-fast watchdog, dialog auto-dismiss).
+**Status: v0.5.** 20 tools, 259 tests (148 unit + 111 end-to-end on real Chrome) plus a 24-case seeded-bug benchmark (`npm run bench`), verified live against wordpress.org. New in v0.5: `inject_css` — the live fix loop (trial a fix on the page, see what changed, converge, write source once) — `navigate { bypassCache }` for stale-stylesheet hard reloads, and blast-radius + scoped-fix reporting on `explain_styles` (change THE button, not all buttons). v0.4 (field-report items): `interact` to drive the UI into a state and inspect it, `measure_element` for sub-pixel glyph/text-ink centering, and an `evaluate` escape hatch — plus element-scoped crops/zoom on `annotated_screenshot`, `match:"any"`/`visibleOnly:false` on `find_elements`, and zero-config cold-start Chrome discovery. v0.3 added the time dimension — event-listener attribution, animation diagnosis, and source-attributed interaction timelines. Hardened for untrusted pages (prompt-injection sanitization, fail-fast watchdog, dialog auto-dismiss).
 
 ## The problem
 
@@ -76,7 +76,7 @@ npm run demo -- https://wordpress.org --selector "a.wp-block-button__link"
 | `page_snapshot` | Pruned, uid-keyed tree of what's visible — geometry, layout hints, invisibility reasons |
 | `page_origins` | Stylesheet inventory + platform detection (WordPress version, theme, builders, optimizers) |
 | `inspect_element` | The "what": box model, computed values, visibility verdict |
-| `explain_styles` | **The wedge**: cascade winner/loser per property with file:line + origin attribution |
+| `explain_styles` | **The wedge**: cascade winner/loser per property with file:line + origin attribution, each winner's **blast radius** (how many other elements it styles), and a scoped-fix selector for just this element |
 | `inspect_ancestors` | Constraint-chain walk: which ancestor constrains width/overflow/stacking |
 | `find_elements` | Deterministic search by text, selector, role, or screen region — AND-combined by default, `match:"any"` for a union, `visibleOnly:false` to include hidden elements |
 | `node_at_point` | x,y → element uid + ancestor chain |
