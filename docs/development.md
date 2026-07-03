@@ -1,9 +1,8 @@
 # Development guide
 
 Building, testing, and extending visionaire-engine. For what the tools do, see
-[tools.md](tools.md); for how the pipeline works internally, see
-[architecture.md](architecture.md); the authoritative design doc is
-[../SPEC.md](../SPEC.md).
+[tools.md](tools.md); for how the pipeline works internally and the
+authoritative design reference, see [architecture.md](architecture.md).
 
 ## Prerequisites
 
@@ -24,7 +23,7 @@ Do not bump these majors casually — each is held where it is on purpose
 | `vitest` (dev) | `^3.2.6` | Same reason — vitest 4 raises the Node floor above 20.9. |
 | `zod` | `^3.25.76` | `@modelcontextprotocol/sdk` (`^1.29.0`) expects zod v3 schemas. Tool `inputSchema`s are zod raw shapes handed to the SDK — zod 4 breaks that contract. |
 
-CDP protocol types come from `puppeteer-core` (SPEC §10) — there is no separate
+CDP protocol types come from `puppeteer-core` — there is no separate
 `devtools-protocol` dependency to keep in sync.
 
 ## Setup
@@ -143,8 +142,8 @@ line shifts every attribution below it.
 
 ### The CDP contract smoke test
 
-The last `describe` block in `test/e2e.test.ts` ("CDP contract smoke
-(SPEC §10)") exists so a Chrome update that breaks our protocol assumptions
+The last `describe` block in `test/e2e.test.ts` (the "CDP contract smoke"
+block) exists so a Chrome update that breaks our protocol assumptions
 fails loudly instead of producing silently wrong verdicts. It asserts, on real
 Chrome:
 
@@ -152,15 +151,15 @@ Chrome:
   `matchingSelectors`, `selectorList.selectors[].text`, and
   `style.cssProperties` — the raw material of the cascade engine;
 - per-declaration `range` + `rule.styleSheetId` are present (the 3-hop
-  declaration → sheet → file:line join in SPEC §7.2 depends on them), and the
+  declaration → sheet → file:line join depends on them), and the
   0-based CDP line matches the fixture's known 1-based line;
 - `inlineStyle` is populated for an element with a `style=""` attribute.
 
 Two *experimental* fields — `selector.specificity` and `rule.layers` — are
 logged as present/absent but never fail the test, because the engine
-feature-detects them and falls back to its own parser (SPEC §9). Note: SPEC §10
-names this test `test/cdp-contract.test.ts`; in the code it lives inside
-`test/e2e.test.ts`.
+feature-detects them and falls back to its own parser. Note: this contract
+check lives inside `test/e2e.test.ts` rather than a standalone
+`test/cdp-contract.test.ts`.
 
 ### Running a subset
 
@@ -171,7 +170,7 @@ npx vitest run -t "letter-spacing"          # by test name
 
 ## Benchmark
 
-`bench/` is the seeded-bug benchmark harness (SPEC §12 item 4) — the regression
+`bench/` is the seeded-bug benchmark harness — the regression
 suite for *explanation quality*, separate from `npm test`. Each fixture page
 under `bench/cases/` seeds exactly **one** known visual bug a real developer
 would report ("the subscribe button has too much space under it").
@@ -196,7 +195,7 @@ and drives the named ToolDef handler directly (`handler(ctx, args)`, like the
 e2e suite). Fixtures load from `file://` by default; a case with
 `"serve": "http"` in the manifest is served from a local `node:http` static
 server instead — the v0.3 time-dimension cases need a real origin, because
-LoAF script attribution is empty on `file://` pages (SPEC §14). The runner
+LoAF script attribution is empty on `file://` pages. The runner
 prints a per-case table — id, status, tool-output tokens, and the tokens of
 one `page_snapshot` per case (the census an agent would realistically spend to
 find the element), reported separately — then a summary line: `N/23 pass,
@@ -208,7 +207,7 @@ full tool output. Exit code 1 on any FAIL, so it is CI-usable.
 1. Create `bench/cases/caseNN-<slug>.html` with its CSS under
    `bench/cases/css/` and any JS under `bench/cases/js/`. WordPress-flavored
    cases put sheets under `bench/cases/wp-content/{themes,plugins}/…` so the
-   URL-convention resolver (SPEC §7.3) fires. Behavioral cases that rely on
+   URL-convention resolver fires. Behavioral cases that rely on
    script attribution should set `"serve": "http"` in their manifest entry.
    Seed exactly one bug and state it in a comment at the top of the page.
 2. Culprit-rule **line numbers are load-bearing**, same convention as
@@ -252,7 +251,7 @@ test/               # unit + e2e + fixtures (see above)
 
 Full data-flow walkthrough: [architecture.md](architecture.md).
 
-Conventions (SPEC §11): ESM + NodeNext — **relative imports must use the `.js`
+Conventions: ESM + NodeNext — **relative imports must use the `.js`
 extension** even in `.ts` files; strict TypeScript; no default exports; token
 estimate is `Math.ceil(chars / 4)` (`estimateTokens` in `src/types.ts`).
 
@@ -448,7 +447,7 @@ typography basics, …). It is consumed in three places:
 To add one, append it to the array — nothing else to register. Costs to weigh:
 every whitelisted property is captured **per node** in page snapshots, so each
 addition adds capture work and potential dossier tokens across all three tools.
-The list exists to keep dossiers in their 300–800 token budget (SPEC §3, §5).
+The list exists to keep dossiers in their 300–800 token budget.
 
 ## Registering with MCP clients
 
@@ -522,7 +521,7 @@ protocol stream before the server even starts. Invoke `node dist/index.js` or
 
 ## Roadmap
 
-Summarized from [../SPEC.md](../SPEC.md) §13:
+Summarized from [architecture.md](architecture.md):
 
 - **v0.1 (shipped):** the first 12 tools, Chromium launch/attach,
   WordPress convention mode (zero WP cooperation).
@@ -530,7 +529,7 @@ Summarized from [../SPEC.md](../SPEC.md) §13:
   tool, via `Overlay.setInspectMode`); the deterministic seeded-bug benchmark
   harness (`bench/`, run with `npm run bench`); minification-aware granularity
   degradation; census platform header.
-- **v0.3 (this codebase — the time dimension, SPEC §14):** `get_listeners`,
+- **v0.3 (this codebase — the time dimension):** `get_listeners`,
   `explain_animations`, `record_interaction`; the ScriptRegistry (JS file:line
   attribution through the WP origin lens); the flex `min-width:auto`
   diagnostic (flipped bench case 9 from XFAIL to PASS).

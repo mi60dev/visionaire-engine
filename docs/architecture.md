@@ -2,7 +2,7 @@
 
 How visionaire-engine turns a rendered page into deterministic, attributable answers — and why it is built this way.
 
-Companion docs: [tools.md](tools.md) (tool-by-tool reference) · [wordpress.md](wordpress.md) (WP origin resolution) · [development.md](development.md) (building and testing) · [../SPEC.md](../SPEC.md) (design spec). Where this document and SPEC.md disagree, this document describes the shipped code.
+Companion docs: [tools.md](tools.md) (tool-by-tool reference) · [wordpress.md](wordpress.md) (WP origin resolution) · [development.md](development.md) (building and testing). This document is the public design reference and describes the shipped code.
 
 ## The core thesis
 
@@ -99,7 +99,7 @@ src/
     annotated-screenshot.ts  screenshot, mark numbers == uid numbers
     style-diff.ts         record/compare slots for verify-my-fix loops
     pick-element.ts       human-in-the-loop click-to-pick (Overlay inspect mode)
-    get-listeners.ts      event listeners with handler file:line (§14.2)
+    get-listeners.ts      event listeners with handler file:line
     explain-animations.ts animation census + declared rules + "not smooth" findings
     record-interaction.ts one interaction → source-attributed causal timeline
 
@@ -119,7 +119,7 @@ src/
     ancestors.ts    self→root walk emitting concern-relevant facts per
                     ancestor and flagging the binding constraint — including
                     the flex min-width:auto shrink trap (see below)
-    animations.ts   the closed "not smooth" ruleset R1–R6 (SPEC §14.3), pure
+    animations.ts   the closed "not smooth" ruleset R1–R6, pure
                     functions over census + computed styles + declarations
 
   attribution/    "which editable thing produced this rule"
@@ -166,7 +166,7 @@ The pure engines (`cascade`, `specificity`, `inactive`, `stacking`, `animations`
 
 **3. Resolve per longhand** with a single comparator, criteria in order:
 
-1. **Inherited proximity first** — any declaration on the element itself beats any inherited one, and nearer ancestors beat farther ones. This deviates from SPEC §6.1 (which lists proximity last) on purpose: inheritance is defaulting, not cascade, and "any direct match beats any inherited" is only satisfiable when proximity is decided before importance — a direct normal declaration must beat an ancestor's `!important` one.
+1. **Inherited proximity first** — any declaration on the element itself beats any inherited one, and nearer ancestors beat farther ones. This deviates from the usual cascade ordering (which lists proximity last) on purpose: inheritance is defaulting, not cascade, and "any direct match beats any inherited" is only satisfiable when proximity is decided before importance — a direct normal declaration must beat an ancestor's `!important` one.
 2. **Origin + importance buckets**: UA normal < author normal < inline normal < author `!important` < inline `!important` < UA `!important`. Injected/inspector sheets bucket with author.
 3. **Cascade layers**: unlayered beats layered for normal declarations, reversed for `!important`. When two *different* layer chains compete, CDP doesn't expose `@layer` statement order, so the code compares chains lexicographically as a deterministic proxy (later chain ≈ later-declared) — exact for unlayered-vs-layered, approximate between two named layers. This is a documented v0.1 limitation.
 4. **Specificity** — CDP's experimental per-selector field when present, else the in-house parser.
@@ -241,7 +241,7 @@ The same honesty rule applies to verdicts (`verdict-uncertain`) and to budget pr
 
 ## The time dimension
 
-Everything above explains a frozen moment. The v0.3 tools (`get_listeners`, `explain_animations`, `record_interaction` — SPEC §14) add *what happened and why*, and they follow one paradigm:
+Everything above explains a frozen moment. The v0.3 tools (`get_listeners`, `explain_animations`, `record_interaction`) add *what happened and why*, and they follow one paradigm:
 
 **Platform-native attribution is the substrate.** Chrome already computes, passively and without perturbing the page, the three attribution signals that matter:
 

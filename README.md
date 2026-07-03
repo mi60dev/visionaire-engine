@@ -87,7 +87,6 @@ Full reference: [docs/tools.md](docs/tools.md)
 - [docs/architecture.md](docs/architecture.md) — how the deterministic pipeline works
 - [docs/wordpress.md](docs/wordpress.md) — WordPress origin resolution guide
 - [docs/development.md](docs/development.md) — building, testing, extending
-- [SPEC.md](SPEC.md) — the authoritative technical specification
 
 ## Design principles
 

@@ -1,6 +1,6 @@
 # Tool reference
 
-Visionaire Engine exposes 16 MCP tools: three session tools (`connect`, `navigate`, `set_viewport`) and thirteen inspection tools — ten for the frozen moment (what the page looks like and why) and three for the time dimension (`get_listeners`, `explain_animations`, `record_interaction` — what happens and why, SPEC §14). All output is plain text (plus one PNG for `annotated_screenshot`), deterministic, and token-budgeted. Concepts and vocabulary come from [../SPEC.md](../SPEC.md); this page documents the tools as implemented.
+Visionaire Engine exposes 16 MCP tools: three session tools (`connect`, `navigate`, `set_viewport`) and thirteen inspection tools — ten for the frozen moment (what the page looks like and why) and three for the time dimension (`get_listeners`, `explain_animations`, `record_interaction` — what happens and why). All output is plain text (plus one PNG for `annotated_screenshot`), deterministic, and token-budgeted. Concepts and vocabulary come from [architecture.md](architecture.md); this page documents the tools as implemented.
 
 ## Targeting elements
 
@@ -267,7 +267,7 @@ why margin-bottom = 30px:
 
 **`→ location`** — where the declaration physically lives, best-honest first: source-mapped authored position (`src/components/hero.scss:42 (via source map)`) > attributed file:line > the served sheet URL trimmed to its last 3 path segments with a leading `…/` > `<inline>` for `<style>` elements > `user-agent stylesheet`. Line numbers are 1-based. When the granularity is `file` (e.g. a minified sheet with no source map — bracket reads `minified, no map` — or a source map that exists but failed to resolve) no line number is printed rather than printing a wrong one.
 
-**`[granularity | label — edit hint]`** — the honesty-ladder bracket after the location. Granularity is one of `line` > `file` > `db-entity` > `component` > `generated` > `unknown` (see [../SPEC.md](../SPEC.md) §5.2). The label names the origin (`theme: astra`, `plugin: myplugin`, `Elementor (post 88)`, `Customizer > Additional CSS`); the part after `—` is the actionable edit surface (`edit this file`, `Elementor editor for post 88 > widget 4f2a1c`, `generated bundle — re-inspect with bypass query param ?nowprocket`). Label and hint are omitted when they add nothing; a sheet-backed rule that could not be classified still gets a bare `[unknown]` plus its selector and declaration text — never silence.
+**`[granularity | label — edit hint]`** — the honesty-ladder bracket after the location. Granularity is one of `line` > `file` > `db-entity` > `component` > `generated` > `unknown`. The label names the origin (`theme: astra`, `plugin: myplugin`, `Elementor (post 88)`, `Customizer > Additional CSS`); the part after `—` is the actionable edit surface (`edit this file`, `Elementor editor for post 88 > widget 4f2a1c`, `generated bundle — re-inspect with bypass query param ?nowprocket`). Label and hint are omitted when they add nothing; a sheet-backed rule that could not be classified still gets a bare `[unknown]` plus its selector and declaration text — never silence.
 
 **`no authored declaration — value comes from browser defaults or inheritance`** — returned for a `property:` filter that matched nothing authored:
 
@@ -284,13 +284,13 @@ element e1 <p#dn-child>
 visibility: display-none — ancestor e2 has display:none (set by inline style)
 ```
 
-**`INACTIVE` notes** — winning declarations that have no effect ("you set it, but…"), from a closed ruleset (width/height on inline elements, flex-item props without a flex parent, `z-index` on `position: static`, `top/left` on static, `text-overflow` without `overflow:hidden` + `nowrap`, and more — SPEC §6.3). Each note gives the declaration, its short location, the reason, and a fix hint:
+**`INACTIVE` notes** — winning declarations that have no effect ("you set it, but…"), from a closed ruleset (width/height on inline elements, flex-item props without a flex parent, `z-index` on `position: static`, `top/left` on static, `text-overflow` without `overflow:hidden` + `nowrap`, and more). Each note gives the declaration, its short location, the reason, and a fix hint:
 
 ```
 - 'z-index: 9999' at theme.css:18 is INACTIVE — 'z-index' has no effect on a position:static element that is not a flex or grid item; add position:relative (or absolute/fixed/sticky)
 ```
 
-**Other notes** — `winner for X sits inside @media (min-width: 768px)` / `… inside @layer fixture` (the winning rule's conditional context); `verdict-uncertain (computed disagrees) for X: predicted '…', computed '…'` (the engine never silently guesses — SPEC §9); `@keyframes present (name) — animated values are not modeled in v0.1; verdicts reflect the static cascade`.
+**Other notes** — `winner for X sits inside @media (min-width: 768px)` / `… inside @layer fixture` (the winning rule's conditional context); `verdict-uncertain (computed disagrees) for X: predicted '…', computed '…'` (the engine never silently guesses); `@keyframes present (name) — animated values are not modeled in v0.1; verdicts reflect the static cascade`.
 
 **`[N more properties — ask with property:]`** — the dossier hit its ~800-token budget; the remaining, less-contended properties were dropped. Re-ask with `property:` for any of them (property-filtered calls are never truncated).
 
@@ -303,7 +303,7 @@ Walk the ancestor chain (self → root) for one concern, printing one compact li
 | `uid` / `selector` / `x`+`y` | TargetSpec | required (one) | Which element |
 | `concern` | `'width' \| 'height' \| 'position' \| 'overflow' \| 'stacking'` | `'width'` | Which constraint chain to report |
 
-Per concern the summary shows: **width/height** — `width`/`max-width`/`min-width`, `box-sizing`, paddings, non-block display, `flex-basis` for flex items, explicit inline `style="width: …"`, and the flex min-size trap: a row flex item whose implicit `min-width: auto` is what makes its row overflow renders `min-width:auto (flex item) — prevents shrinking below content` (column direction gets the `min-height` analog); **position** — `position`, non-auto insets, `z-index`, and `transform:set (containing block)` (a transformed ancestor is the containing block even for `position:fixed`); **overflow** — `overflow`, `clip-path`, `contain`, `content-visibility`; **stacking** — `z-index`, `position`, and the stacking-context creator reason per SPEC §6.4.
+Per concern the summary shows: **width/height** — `width`/`max-width`/`min-width`, `box-sizing`, paddings, non-block display, `flex-basis` for flex items, explicit inline `style="width: …"`, and the flex min-size trap: a row flex item whose implicit `min-width: auto` is what makes its row overflow renders `min-width:auto (flex item) — prevents shrinking below content` (column direction gets the `min-height` analog); **position** — `position`, non-auto insets, `z-index`, and `transform:set (containing block)` (a transformed ancestor is the containing block even for `position:fixed`); **overflow** — `overflow`, `clip-path`, `contain`, `content-visibility`; **stacking** — `z-index`, `position`, and the stacking-context creator reason.
 
 **Output** — real examples:
 
@@ -500,11 +500,11 @@ ancestors (click):
   (none up the chain — document and window included)
 ```
 
-Listener lines read `type → handlerName @ file:line  [granularity | origin]  (flags)`. Handler names are recovered from script source (anonymous/arrow handlers render as plain `handler`; inline `onclick="…"` attributes render as `inline onclick attribute`). Flags appear only when non-default — except `passive`, which is always spelled out for scroll-blocking events (`wheel`, `touchstart`, `touchmove`). **Delegation honesty rule** (SPEC §14.2): a handler whose script is a known delegation framework is labeled `delegated (react-dom)` / `(jquery)` / `(vue)` with a closing note that the component-level handler is not resolvable at the DOM level — read the component source; the tool never pretends to find the JSX handler.
+Listener lines read `type → handlerName @ file:line  [granularity | origin]  (flags)`. Handler names are recovered from script source (anonymous/arrow handlers render as plain `handler`; inline `onclick="…"` attributes render as `inline onclick attribute`). Flags appear only when non-default — except `passive`, which is always spelled out for scroll-blocking events (`wheel`, `touchstart`, `touchmove`). **Delegation honesty rule**: a handler whose script is a known delegation framework is labeled `delegated (react-dom)` / `(jquery)` / `(vue)` with a closing note that the component-level handler is not resolvable at the DOM level — read the component source; the tool never pretends to find the JSX handler.
 
 ## explain_animations
 
-Animations and transitions touching one element, both halves deterministic: what is animating **now** (an in-page `getAnimations()` census — type, play state, timing, animated properties) and what is **declared** even when idle (the winning `transition`/`animation` declarations and `@keyframes`, attributed to file:line through the same cascade + origin machinery as `explain_styles`). On top of both sits a closed "not smooth" ruleset (SPEC §14.3): non-animatable properties in `transition-property` (R1), the `width`/`height: auto` interpolation trap (R2), main-thread (layout/paint) jank risk for properties outside transform/opacity/filter (R3), missing or zero-duration transitions — "changes are instant by design" (R4), active `prefers-reduced-motion` (R5), and the rAF-blindness honesty note when the census is empty (R6). Use it when something "pops instead of fading", stutters, or never animates at all.
+Animations and transitions touching one element, both halves deterministic: what is animating **now** (an in-page `getAnimations()` census — type, play state, timing, animated properties) and what is **declared** even when idle (the winning `transition`/`animation` declarations and `@keyframes`, attributed to file:line through the same cascade + origin machinery as `explain_styles`). On top of both sits a closed "not smooth" ruleset: non-animatable properties in `transition-property` (R1), the `width`/`height: auto` interpolation trap (R2), main-thread (layout/paint) jank risk for properties outside transform/opacity/filter (R3), missing or zero-duration transitions — "changes are instant by design" (R4), active `prefers-reduced-motion` (R5), and the rAF-blindness honesty note when the census is empty (R6). Use it when something "pops instead of fading", stutters, or never animates at all.
 
 | Parameter | Type | Default | Meaning |
 |---|---|---|---|
@@ -528,7 +528,7 @@ notes:
 
 ## record_interaction
 
-One interaction, one source-attributed causal timeline. The tool performs (or watches) a single interaction and records what happened — handler dispatch, DOM mutations, transitions starting/being cancelled, layout shifts, console errors — each line time-stamped, uid-keyed, and attributed to file:line where the platform provides attribution (SPEC §14.4). It is built on Chrome's own passively-computed signals (Long Animation Frames script attribution, `layout-shift` sources, creation stack traces for inserted nodes) merged with the CDP Animation and DOM event streams — **not** a bespoke mutation tracer, and never a debugger pause (pausing mid-interaction would cancel the very animations under investigation). Use it for "the animation isn't smooth", "clicking does something weird", or any bug you can only see *while it happens*.
+One interaction, one source-attributed causal timeline. The tool performs (or watches) a single interaction and records what happened — handler dispatch, DOM mutations, transitions starting/being cancelled, layout shifts, console errors — each line time-stamped, uid-keyed, and attributed to file:line where the platform provides attribution. It is built on Chrome's own passively-computed signals (Long Animation Frames script attribution, `layout-shift` sources, creation stack traces for inserted nodes) merged with the CDP Animation and DOM event streams — **not** a bespoke mutation tracer, and never a debugger pause (pausing mid-interaction would cancel the very animations under investigation). Use it for "the animation isn't smooth", "clicking does something weird", or any bug you can only see *while it happens*.
 
 | Parameter | Type | Default | Meaning |
 |---|---|---|---|
@@ -566,4 +566,4 @@ Honesty notes are part of the format: CDP DOM events carry no timestamps, so `t=
 5. **When the bug only happens on interaction** — "clicking does nothing" starts at **`get_listeners`** (who owns this event, or the honest "nobody does"); "it doesn't animate right" starts at **`explain_animations`** (`property:` set to what you expected to move); and when the static answers don't explain it, **`record_interaction`** on the trigger element captures the causal timeline of the interaction itself.
 6. **Verify: `style_diff`** — `{ uid: "e5", mode: "record" }`, apply the fix, `navigate` to reload (uids go stale, but the slot re-resolves by selector), then `{ mode: "compare" }`. The diff should contain exactly the properties you meant to change — nothing missing, nothing extra. For a behavioral fix, re-run `record_interaction` instead and compare timelines.
 
-Related reading: [architecture.md](architecture.md) (how the deterministic pipeline works), [wordpress.md](wordpress.md) (origin resolution details), [../SPEC.md](../SPEC.md) (the authoritative spec).
+Related reading: [architecture.md](architecture.md) (how the deterministic pipeline works), [wordpress.md](wordpress.md) (origin resolution details).

@@ -6,7 +6,6 @@ This guide is for WordPress freelancers and agencies (you don't need to know wha
 
 - What the tools return in general: [tools.md](tools.md)
 - How the pipeline works: [architecture.md](architecture.md)
-- Design doc: [../SPEC.md](../SPEC.md) (§7.3 is the WordPress section)
 
 ---
 
@@ -52,7 +51,7 @@ The detection surfaces in two places:
 
 ### The granularity label (honesty ladder)
 
-Every attribution says how good the answer is ([../SPEC.md](../SPEC.md) §5.2):
+Every attribution says how good the answer is:
 
 | Label | Means | On WordPress, typically |
 |---|---|---|
@@ -305,4 +304,4 @@ Zero-cooperation detection is deliberately honest about where it stops:
 - **The parent/child theme heuristic can guess wrong** when neither the `-child` slug convention nor a direct root `style.css` tells the two slugs apart — it then assumes the theme with fewer stylesheets is the child. Rule-level attribution sidesteps this by always labeling `theme: {slug}` with the concrete file path.
 - **`mu-plugins` has no dedicated rule.** Must-use plugin stylesheets (`/wp-content/mu-plugins/…`) get the generic host-label classification, not a `plugin:` label. The file path is still correct and editable.
 
-**The v1.1 plan lifts the big ones.** [../SPEC.md](../SPEC.md) §13 sketches a WordPress companion plugin (~6 Abilities on the official mcp-adapter, WP 6.9+) that adds exactly what convention mode can't see: the enqueue registry (handle → owner), `_elementor_data` resolution (widget id → the named control), Site-Editor template-override detection, and staleness checks for generated CSS. Convention mode stays the zero-install default; the plugin upgrades granularity when present.
+**The v1.1 plan lifts the big ones.** [architecture.md](architecture.md) sketches a WordPress companion plugin (~6 Abilities on the official mcp-adapter, WP 6.9+) that adds exactly what convention mode can't see: the enqueue registry (handle → owner), `_elementor_data` resolution (widget id → the named control), Site-Editor template-override detection, and staleness checks for generated CSS. Convention mode stays the zero-install default; the plugin upgrades granularity when present.
