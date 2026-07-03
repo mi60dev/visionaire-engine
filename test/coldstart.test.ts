@@ -11,7 +11,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { findPuppeteerCachedChrome } from '../src/session.js'
+import { findPuppeteerCachedChrome, isSandboxBlocked } from '../src/session.js'
 
 /** Relative path from a `<version>/<platform>` root to the binary, per OS. */
 function relBinary(): string[] {
@@ -87,5 +87,21 @@ describe('findPuppeteerCachedChrome', () => {
     fs.writeFileSync(path.join(tmp, '.DS_Store'), 'junk')
     const binary = writeFakeChrome(tmp, 'mac_arm-131.0.6778.204')
     expect(findPuppeteerCachedChrome(tmp)).toBe(binary)
+  })
+})
+
+describe('isSandboxBlocked (launch-failure classifier)', () => {
+  it('matches classic sandbox messages', () => {
+    expect(isSandboxBlocked('No usable sandbox! Update your kernel')).toBe(true)
+    expect(isSandboxBlocked('The SUID sandbox helper binary was found, but is not configured correctly')).toBe(true)
+    expect(isSandboxBlocked('Failed to move to new namespace')).toBe(true)
+  })
+  it('matches Ubuntu 24.04 AppArmor/userns shapes that never say "sandbox"', () => {
+    expect(isSandboxBlocked('clone() failed: Operation not permitted')).toBe(true)
+    expect(isSandboxBlocked('unshare(CLONE_NEWUSER): EPERM')).toBe(true)
+  })
+  it('does not match unrelated failures', () => {
+    expect(isSandboxBlocked('error while loading shared libraries: libnss3.so')).toBe(false)
+    expect(isSandboxBlocked('Failed to launch the browser process! Code: null')).toBe(false)
   })
 })

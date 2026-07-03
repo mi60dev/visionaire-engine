@@ -152,28 +152,69 @@ function baseLaunchArgs(): string[] {
   const forceSandbox = process.env['VISIONAIRE_SANDBOX'] === '1'
   const forceNoSandbox = process.env['VISIONAIRE_NO_SANDBOX'] === '1'
   if (forceNoSandbox || (isRoot && !forceSandbox)) args.push(...NO_SANDBOX_ARGS)
+  // WSL/Docker give Chrome a tiny /dev/shm; under load it crashes AT LAUNCH
+  // ("Failed to launch the browser process ... Code: null"). Writing shared
+  // memory to /tmp instead costs a little perf and removes a whole crash class.
+  if (process.platform === 'linux') args.push('--disable-dev-shm-usage')
   const extra = process.env['VISIONAIRE_CHROME_ARGS']
   if (extra) args.push(...extra.split(/\s+/).filter(Boolean))
   return args
 }
 
-/** Launch Chrome, retrying once without the sandbox if that's what blocked it (WSL/Docker). */
+/**
+ * Does this launch-failure text look like the sandbox was the blocker?
+ * Ubuntu 24.04 AppArmor and userns restrictions kill Chrome with messages that
+ * never contain the word "sandbox" — match those shapes too. Exported for tests.
+ */
+export function isSandboxBlocked(msg: string): boolean {
+  return /sandbox|SUID|namespace|Operation not permitted|clone\(|EPERM|PERMISSION_DENIED|unshare/i.test(msg)
+}
+
+const LAUNCH_HINTS =
+  '\nTroubleshooting:\n' +
+  '  • transient crash (WSL memory pressure): simply retry connect; increase WSL memory in .wslconfig if frequent\n' +
+  '  • sandbox blocked (Ubuntu 24.04 AppArmor/userns): set VISIONAIRE_NO_SANDBOX=1 in the MCP server env\n' +
+  '  • missing shared libraries: sudo apt-get install -y libnss3 libatk-bridge2.0-0 libgbm1 libasound2\n' +
+  '  • to see the FULL Chrome stderr, run from the repo:  npm run demo -- https://example.com --selector h1\n' +
+  '  • extra flags: VISIONAIRE_CHROME_ARGS, e.g. "--single-process" as a last resort in minimal containers'
+
+/**
+ * Launch Chrome with two safety nets: a no-sandbox retry when the failure looks
+ * sandbox-shaped, and a single plain retry for transient startup crashes
+ * (intermittent "Code: null" kills under WSL/Docker memory pressure).
+ */
 async function launchChrome(base: LaunchOptions): Promise<Browser> {
   const args = baseLaunchArgs()
   try {
     return await puppeteer.launch({ ...base, args })
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    const sandboxBlocked = /sandbox|SUID|namespace/i.test(msg)
-    if (sandboxBlocked && process.env['VISIONAIRE_SANDBOX'] !== '1' && !args.includes('--no-sandbox')) {
+    if (isSandboxBlocked(msg) && process.env['VISIONAIRE_SANDBOX'] !== '1' && !args.includes('--no-sandbox')) {
       console.error(
-        '[visionaire] Chrome could not start its sandbox (common on WSL/Docker) — retrying with ' +
+        '[visionaire] Chrome could not start its sandbox (common on WSL/Docker/Ubuntu-24.04) — retrying with ' +
           '--no-sandbox. Set VISIONAIRE_NO_SANDBOX=1 to make this the default, or VISIONAIRE_SANDBOX=1 ' +
           'to keep the sandbox and fail instead.',
       )
-      return await puppeteer.launch({ ...base, args: [...args, ...NO_SANDBOX_ARGS] })
+      try {
+        return await puppeteer.launch({ ...base, args: [...args, ...NO_SANDBOX_ARGS] })
+      } catch (err2) {
+        throw enrich(err2)
+      }
     }
-    throw err
+    // Transient startup crash (OOM kill, race) — one plain retry after a beat.
+    console.error('[visionaire] browser launch failed once — retrying (transient startup crashes are common on WSL):')
+    console.error(`[visionaire]   ${msg.split('\n')[0]}`)
+    await new Promise((r) => setTimeout(r, 300))
+    try {
+      return await puppeteer.launch({ ...base, args })
+    } catch (err2) {
+      throw enrich(err2)
+    }
+  }
+
+  function enrich(err: unknown): Error {
+    const msg = err instanceof Error ? err.message : String(err)
+    return new Error(msg + LAUNCH_HINTS)
   }
 }
 

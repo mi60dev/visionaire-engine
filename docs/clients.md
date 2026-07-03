@@ -223,6 +223,15 @@ process isolation, so on a machine where you point visionaire at genuinely
 untrusted sites, prefer fixing the sandbox (e.g. enable user namespaces) over
 disabling it.
 
+**"Failed to launch the browser process! … Code: null" (intermittent).** Chrome was
+killed at startup rather than exiting — on WSL/Docker this is usually `/dev/shm`
+exhaustion or an AppArmor/user-namespace kill. visionaire now launches Linux
+Chrome with `--disable-dev-shm-usage`, retries once on transient crashes, retries
+without the sandbox when the failure is sandbox-shaped, and appends these hints to
+the error. If it persists: `VISIONAIRE_NO_SANDBOX=1` (Ubuntu 24.04 AppArmor), give
+WSL more memory (`.wslconfig`), and to see the full Chrome stderr run
+`npm run demo -- https://example.com --selector h1` from the repo.
+
 **Missing system libraries** (`error while loading shared libraries: libnss3.so`
 or similar). Chrome needs a set of shared libs. Installing Google Chrome via the
 `.deb` above pulls them in automatically; a manually-downloaded Chrome for Testing
