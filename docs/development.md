@@ -452,26 +452,18 @@ The list exists to keep dossiers in their 300–800 token budget (SPEC §3, §5)
 
 ## Registering with MCP clients
 
-Build first (`npm run build`), then:
+For copy-paste configs for every popular client — Claude Code, Claude Desktop,
+Cursor, GitHub Copilot (VS Code **and** CLI), and Google Antigravity — see the
+dedicated **[client setup guide](clients.md)**. The essentials for local hacking:
 
-**Claude Code**
+Build first (`npm run build`), then, for Claude Code:
 
 ```bash
 claude mcp add visionaire -- node /absolute/path/to/visionaire-engine/dist/index.js
 ```
 
-**Generic stdio config** (Claude Desktop, Cursor, and most other clients):
-
-```json
-{
-  "mcpServers": {
-    "visionaire": {
-      "command": "node",
-      "args": ["/absolute/path/to/visionaire-engine/dist/index.js"]
-    }
-  }
-}
-```
+Any other stdio client uses `command: "node"` + `args: ["…/dist/index.js"]` under
+its own top-level key (`mcpServers` for most; **`servers`** for VS Code Copilot).
 
 **Gotcha: Claude Code and the Claude desktop app read different configs.**
 On one machine there are two independent MCP registries, and registering in
