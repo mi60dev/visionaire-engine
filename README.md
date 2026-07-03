@@ -47,10 +47,16 @@ Using **GitHub Copilot, Cursor, Claude Desktop, Google Antigravity**, or another
 client? See **[docs/clients.md](docs/clients.md)** for a copy-paste config for each,
 plus browser-install help for Linux/WSL/Docker.
 
+**Run it from your project's root directory** — visionaire is at its best when the
+agent has both the running site *and* its source on disk, so it can cross-reference
+the two. Ground before you search: take a `page_snapshot` (or read the source) to
+get real element names instead of guessing selectors. If a selector matches
+nothing, the error suggests the closest real ids/classes on the page.
+
 Then in a session:
 
 1. `connect { url: "https://your-site.com" }` — launches Chrome (or `{ browserUrl: "http://127.0.0.1:9222" }` to attach to your real logged-in browser)
-2. `page_snapshot {}` — uid-keyed census of what's visible
+2. `page_snapshot {}` — uid-keyed census of what's visible; **target elements by their `uid`**, not invented selectors
 3. `explain_styles { uid: "e17", property: "margin-bottom" }` — cascade verdict with file:line
 
 Try it without an MCP client:

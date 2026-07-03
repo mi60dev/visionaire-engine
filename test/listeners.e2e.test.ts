@@ -130,7 +130,7 @@ describe.skipIf(!chromePath)('get_listeners e2e — real Chrome', () => {
   it('rejects unknown targets with actionable messages', async () => {
     await expect(run({ uid: 'e999' })).rejects.toThrow(/page_snapshot/)
     await expect(run({ selector: '#does-not-exist' })).rejects.toThrow(
-      /No element matches selector: #does-not-exist/,
+      /No element matches selector "#does-not-exist"/,
     )
     await expect(run({})).rejects.toThrow(/exactly one of/i)
   })

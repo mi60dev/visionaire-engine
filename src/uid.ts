@@ -5,6 +5,7 @@
 import type { Protocol } from 'puppeteer-core'
 import type { ResolvedNode, TargetSpec, ToolContext, UidEntry, UidRegistryLike } from './types.js'
 import { sanitizePageText } from './types.js'
+import { selectorHelp } from './engine/suggest.js'
 
 /**
  * The registry is the choke point where page-derived strings enter tool output —
@@ -90,11 +91,20 @@ export async function resolveTarget(ctx: ToolContext, target: TargetSpec): Promi
 
   let nodeId: Protocol.DOM.NodeId
   if (target.selector !== undefined) {
-    const res = (await ctx.cdp.send('DOM.querySelector', {
-      nodeId: doc.root.nodeId,
-      selector: target.selector,
-    })) as Protocol.DOM.QuerySelectorResponse
-    if (!res.nodeId) throw new Error(`No element matches selector: ${target.selector}`)
+    let res: Protocol.DOM.QuerySelectorResponse
+    try {
+      res = (await ctx.cdp.send('DOM.querySelector', {
+        nodeId: doc.root.nodeId,
+        selector: target.selector,
+      })) as Protocol.DOM.QuerySelectorResponse
+    } catch {
+      // CDP rejects malformed selectors — report that clearly rather than as "no match".
+      throw new Error(`Invalid CSS selector: ${target.selector}`)
+    }
+    if (!res.nodeId) {
+      const help = await selectorHelp(ctx, target.selector)
+      throw new Error(`No element matches selector "${target.selector}". ${help}`)
+    }
     nodeId = res.nodeId
   } else {
     const res = (await ctx.cdp.send('DOM.getNodeForLocation', {

@@ -127,8 +127,28 @@ function registerToolDef(server: McpServer, session: SessionManager, def: ToolDe
   )
 }
 
+const SERVER_INSTRUCTIONS = [
+  'visionaire-engine gives deterministic "why" facts about a LIVE web page: cascade winners with',
+  'file:line, visibility causes, event-listener/animation/interaction attribution. No AI inside —',
+  'you do the fuzzy reasoning.',
+  '',
+  'Ground yourself BEFORE targeting elements — do not guess CSS selectors. A selector that is not in',
+  'the live DOM just wastes a round-trip. Instead:',
+  '  1. call `connect`, then `page_snapshot` to get the real uid-keyed element tree;',
+  '  2. target elements by `uid` from that snapshot (stable until navigation), or use `find_elements`',
+  '     (by text/role/region) or `node_at_point` — not invented selectors;',
+  '  3. you typically also have this project\'s SOURCE on disk — read it to find the actual class/id',
+  '     names, template, and handler files before searching the page.',
+  '',
+  'Run this server from the project\'s root directory so the live page and the source you read line up.',
+  'When a selector matches nothing, the error suggests the closest real ids/classes on the page.',
+].join('\n')
+
 export function createServer(session: SessionManager): McpServer {
-  const server = new McpServer({ name: 'visionaire-engine', version: '0.1.0' })
+  const server = new McpServer(
+    { name: 'visionaire-engine', version: '0.1.0' },
+    { instructions: SERVER_INSTRUCTIONS },
+  )
 
   server.registerTool(
     'connect',
@@ -151,7 +171,12 @@ export function createServer(session: SessionManager): McpServer {
         const viewport = ctx.page.viewport()
         const vp = viewport ? `${viewport.width}x${viewport.height}` : 'browser window size'
         const mode = args.mode ?? (args.browserUrl ? 'attach' : 'launch')
-        return ok(`connected (${mode}) — ${version} — viewport ${vp}\nurl: ${ctx.page.url()}`)
+        return ok(
+          `connected (${mode}) — ${version} — viewport ${vp}\nurl: ${ctx.page.url()}\n` +
+            `working dir: ${process.cwd()}\n` +
+            'next: page_snapshot to get real uids — target by uid, not guessed selectors ' +
+            "(read this project's source for actual class/id names).",
+        )
       } catch (err) {
         return errorResult(err)
       }

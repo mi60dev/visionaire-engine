@@ -172,6 +172,19 @@ client only accepts a single shell command, use: `node /abs/.../dist/index.js`.
 
 ---
 
+## Run it from your project directory
+
+visionaire shines when the agent can line up the **live page** with the
+**project source** it's editing. Register it per-project (or launch your client
+from the project root) so the server's working directory is the site's source
+tree — the `connect` response reports that directory back to the agent. Then the
+agent can read the real class/id names, templates, and handler files from disk
+instead of guessing selectors against the running page.
+
+The server also tells the agent (via MCP "instructions") to **ground before it
+searches**: snapshot or read source first, target elements by `uid`, and treat a
+no-match as a prompt to look, not to guess again.
+
 ## First run in any client
 
 Once registered, drive it in natural language — the agent calls the tools:

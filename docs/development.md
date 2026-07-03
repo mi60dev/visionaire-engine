@@ -32,7 +32,7 @@ CDP protocol types come from `puppeteer-core` — there is no separate
 git clone <repo> && cd visionaire-engine
 npm install
 npm run build     # tsc → dist/
-npm test          # 182 tests; the e2e part auto-skips without Chrome
+npm test          # 186 tests; the e2e part auto-skips without Chrome
 ```
 
 ## Commands
@@ -40,7 +40,7 @@ npm test          # 182 tests; the e2e part auto-skips without Chrome
 | Command | What it runs | Notes |
 |---|---|---|
 | `npm run build` | `tsc -p tsconfig.json` | Emits `dist/` with declarations + source maps. `dist/index.js` is the `bin` entry. |
-| `npm test` | `vitest run` | All 11 test files. 60 s test/hook timeouts (browser startup headroom). |
+| `npm test` | `vitest run` | All 12 test files. 60 s test/hook timeouts (browser startup headroom). |
 | `npm run dev` | `tsx src/index.ts` | The MCP server from source, on stdio. It waits for an MCP client on stdin — see [Registering with MCP clients](#registering-with-mcp-clients) before wiring it up. |
 | `npm run bench` | `tsx bench/run.ts` | The 23-case seeded-bug benchmark on real headless Chrome — see [Benchmark](#benchmark). |
 | `npm run demo` | `tsx scripts/demo.ts` | CLI loop with no MCP client needed — see below. |
@@ -103,7 +103,7 @@ client, no build step (tsx runs TypeScript directly).
 
 ## Tests
 
-Eleven files, 182 tests total (129 pure unit + 53 e2e):
+Twelve files, 186 tests total (129 pure unit + 57 e2e):
 
 | File | Tests | Browser? | What it covers |
 |---|---|---|---|
@@ -118,6 +118,8 @@ Eleven files, 182 tests total (129 pure unit + 53 e2e):
 | `test/interaction.e2e.test.ts` | 12 | **real headless Chrome** | `record_interaction` against `fixtures/sidebar.html`, served over a local `node:http` server (LoAF script attribution is empty on `file://` pages): the cancelled-transition verdict, handler attribution, mutation/layout-shift lines, teardown. |
 | `test/hardening.test.ts` | 8 | no | `sanitizePageText` (prompt-injection defense) and the `withWatchdog` fail-fast wrapper. |
 | `test/hardening.e2e.test.ts` | 3 | **real headless Chrome** | Untrusted-page posture against `fixtures/hostile.html`: dialog auto-dismiss (no dead-lock), injection-shaped text neutralized in output, zero-size custom element handled. |
+| `test/suggest.e2e.test.ts` | 4 | **real headless Chrome** | Near-miss selector suggestions: a guessed id/class that is not in the DOM returns the closest real names + a grounding nudge; malformed selectors report as invalid.
+
 
 The unit tests are pure functions over constructed data — they run in
 milliseconds and need no browser. The e2e files wrap everything in

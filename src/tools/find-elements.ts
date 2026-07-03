@@ -7,6 +7,7 @@
 import type { Protocol } from 'puppeteer-core'
 import { z } from 'zod'
 import type { ToolContext, ToolDef } from '../types.js'
+import { selectorHelp } from '../engine/suggest.js'
 
 const OBJECT_GROUP = 'visionaire-find-elements'
 
@@ -160,7 +161,12 @@ export const findElementsTool: ToolDef = {
 
       if (meta.total === 0) {
         const hint = a.visibleOnly ? 'try visibleOnly: false or fewer criteria' : 'try fewer criteria'
-        return { text: `no elements matched (criteria are AND-combined; ${hint})` }
+        // A guessed selector that matches nothing is the common failure — offer live near-misses.
+        const suggestion =
+          typeof a.selector === 'string' && a.selector
+            ? ` ${await selectorHelp(ctx, a.selector)}`
+            : ' Take a page_snapshot to see the real element tree, or read the project source for actual names.'
+        return { text: `no elements matched (criteria are AND-combined; ${hint}).${suggestion}` }
       }
 
       const lines: string[] = []
