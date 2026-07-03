@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import puppeteer from 'puppeteer-core'
-import type { Browser, CDPSession, Page, Protocol } from 'puppeteer-core'
+import type { Browser, CDPSession, LaunchOptions, Page, Protocol } from 'puppeteer-core'
 import { ScriptRegistry } from './attribution/scripts.js'
 import { StylesheetRegistry } from './attribution/stylesheets.js'
 import type { ToolContext } from './types.js'
@@ -61,6 +61,47 @@ export function findChromeExecutable(): string | undefined {
   return undefined
 }
 
+const NO_SANDBOX_ARGS = ['--no-sandbox', '--disable-setuid-sandbox']
+
+/**
+ * Chrome's sandbox can't initialize as root or in many WSL/Docker setups. We keep
+ * the sandbox ON by default (visionaire visits untrusted pages) and only force it
+ * off when it genuinely can't work (root) or the user opts in. When a normal launch
+ * fails specifically on the sandbox, launchChrome() retries once with it disabled
+ * and logs the downgrade — so it "just works" on WSL without silently weakening
+ * isolation everywhere.
+ */
+function baseLaunchArgs(): string[] {
+  const args: string[] = []
+  const isRoot = typeof process.getuid === 'function' && process.getuid() === 0
+  const forceSandbox = process.env['VISIONAIRE_SANDBOX'] === '1'
+  const forceNoSandbox = process.env['VISIONAIRE_NO_SANDBOX'] === '1'
+  if (forceNoSandbox || (isRoot && !forceSandbox)) args.push(...NO_SANDBOX_ARGS)
+  const extra = process.env['VISIONAIRE_CHROME_ARGS']
+  if (extra) args.push(...extra.split(/\s+/).filter(Boolean))
+  return args
+}
+
+/** Launch Chrome, retrying once without the sandbox if that's what blocked it (WSL/Docker). */
+async function launchChrome(base: LaunchOptions): Promise<Browser> {
+  const args = baseLaunchArgs()
+  try {
+    return await puppeteer.launch({ ...base, args })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    const sandboxBlocked = /sandbox|SUID|namespace/i.test(msg)
+    if (sandboxBlocked && process.env['VISIONAIRE_SANDBOX'] !== '1' && !args.includes('--no-sandbox')) {
+      console.error(
+        '[visionaire] Chrome could not start its sandbox (common on WSL/Docker) — retrying with ' +
+          '--no-sandbox. Set VISIONAIRE_NO_SANDBOX=1 to make this the default, or VISIONAIRE_SANDBOX=1 ' +
+          'to keep the sandbox and fail instead.',
+      )
+      return await puppeteer.launch({ ...base, args: [...args, ...NO_SANDBOX_ARGS] })
+    }
+    throw err
+  }
+}
+
 export interface ConnectOptions {
   mode?: 'launch' | 'attach'
   url?: string
@@ -101,11 +142,15 @@ export class SessionManager {
       const executablePath = findChromeExecutable()
       if (!executablePath) {
         throw new Error(
-          'No Chrome executable found. Set the CHROME_PATH env var, install Google Chrome, ' +
-            'or use mode:"attach" with browserUrl against a running Chrome.',
+          'No Chrome/Chromium found. puppeteer-core does not bundle a browser — install one, then retry:\n' +
+            '  • Debian/Ubuntu/WSL: download Google Chrome and `sudo apt-get install -y ./google-chrome-stable_current_amd64.deb`\n' +
+            '    (from https://www.google.com/chrome/) — apt pulls in the required system libraries.\n' +
+            '  • or: `npx @puppeteer/browsers install chrome@stable`, then set CHROME_PATH to the printed binary path.\n' +
+            '  • or point CHROME_PATH at any existing Chrome/Chromium binary.\n' +
+            '  • or use mode:"attach" with browserUrl against a Chrome started with --remote-debugging-port.',
         )
       }
-      browser = await puppeteer.launch({
+      browser = await launchChrome({
         executablePath,
         headless: opts.headless ?? false,
         defaultViewport: { width, height },

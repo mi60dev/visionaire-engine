@@ -19,6 +19,27 @@ Then use the **absolute** path to `dist/index.js` in the configs below. On
 macOS/Linux, `echo "$PWD/dist/index.js"` prints it; on Windows use the full
 `C:\...\dist\index.js` path with escaped backslashes in JSON (`\\`).
 
+## Prerequisite: a Chrome/Chromium browser
+
+visionaire drives a real browser via the Chrome DevTools Protocol, and
+`puppeteer-core` **does not bundle one** — so you need Chrome or Chromium
+installed. On macOS and Windows with Chrome installed, it's found automatically.
+If you get *"No Chrome/Chromium found"* (common on a fresh **Linux / WSL / Docker**
+box), install one:
+
+```bash
+# Debian / Ubuntu / WSL — apt resolves the required system libraries for you:
+curl -fsSLO https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+sudo apt-get install -y ./google-chrome-stable_current_amd64.deb    # → /usr/bin/google-chrome, auto-detected
+
+# or fetch a self-contained Chrome for Testing and point CHROME_PATH at it:
+npx @puppeteer/browsers install chrome@stable
+export CHROME_PATH="/path/printed/by/the/command/chrome"
+```
+
+`CHROME_PATH` overrides browser discovery in every environment. See
+[Troubleshooting](#troubleshooting) below if Chrome is installed but won't launch.
+
 > **Two schema gotchas that break copy-paste between clients:**
 > 1. **VS Code Copilot uses `servers`** as the top-level key. Everyone else uses `mcpServers`.
 > 2. **Copilot CLI additionally needs** `"type": "local"` and a `"tools"` field.
@@ -163,3 +184,33 @@ For attaching to your **real, logged-in browser** (wp-admin, dashboards) instead
 of a fresh one, start Chrome with `--remote-debugging-port=9222` and ask the agent
 to `connect` with `browserUrl: "http://127.0.0.1:9222"`. See [tools.md](tools.md)
 for the full tool reference.
+
+## Troubleshooting
+
+**"No Chrome/Chromium found."** No browser is installed (or it's in a non-standard
+location). Install one per [Prerequisite: a browser](#prerequisite-a-chromechromium-browser),
+or set `CHROME_PATH` to an existing binary.
+
+**Chrome is installed but won't launch on WSL / Docker / a Linux server.** Headless
+Chrome's sandbox can't initialize in many of these environments. visionaire keeps
+the sandbox on by default (it visits untrusted pages) and, when a launch fails
+*specifically* because of the sandbox, automatically retries once with
+`--no-sandbox` and logs a warning. To control this explicitly:
+
+| Env var | Effect |
+|---|---|
+| `VISIONAIRE_NO_SANDBOX=1` | Always launch with `--no-sandbox` (skip the retry dance). Convenient on a trusted dev box. |
+| `VISIONAIRE_SANDBOX=1` | Never disable the sandbox — fail instead of falling back. Most secure. |
+| `VISIONAIRE_CHROME_ARGS="…"` | Extra space-separated flags passed to Chrome (e.g. `--disable-dev-shm-usage` on low-`/dev/shm` Docker). |
+| `CHROME_PATH=/path/to/chrome` | Use a specific browser binary. |
+
+Running the MCP server as **root** (typical in Docker) disables the sandbox
+automatically, since it can't work there. `--no-sandbox` weakens the browser's
+process isolation, so on a machine where you point visionaire at genuinely
+untrusted sites, prefer fixing the sandbox (e.g. enable user namespaces) over
+disabling it.
+
+**Missing system libraries** (`error while loading shared libraries: libnss3.so`
+or similar). Chrome needs a set of shared libs. Installing Google Chrome via the
+`.deb` above pulls them in automatically; a manually-downloaded Chrome for Testing
+may not. On Debian/Ubuntu: `sudo apt-get install -y libnss3 libatk-bridge2.0-0 libgbm1 libasound2`.

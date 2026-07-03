@@ -44,7 +44,8 @@ claude mcp add visionaire -- node /absolute/path/to/visionaire-engine/dist/index
 ```
 
 Using **GitHub Copilot, Cursor, Claude Desktop, Google Antigravity**, or another
-client? See **[docs/clients.md](docs/clients.md)** for a copy-paste config for each.
+client? See **[docs/clients.md](docs/clients.md)** for a copy-paste config for each,
+plus browser-install help for Linux/WSL/Docker.
 
 Then in a session:
 
