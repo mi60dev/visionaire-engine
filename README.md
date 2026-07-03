@@ -43,6 +43,9 @@ npm install && npm run build
 claude mcp add visionaire -- node /absolute/path/to/visionaire-engine/dist/index.js
 ```
 
+Using **GitHub Copilot, Cursor, Claude Desktop, Google Antigravity**, or another
+client? See **[docs/clients.md](docs/clients.md)** for a copy-paste config for each.
+
 Then in a session:
 
 1. `connect { url: "https://your-site.com" }` — launches Chrome (or `{ browserUrl: "http://127.0.0.1:9222" }` to attach to your real logged-in browser)
@@ -79,6 +82,7 @@ Full reference: [docs/tools.md](docs/tools.md)
 
 ## Documentation
 
+- [docs/clients.md](docs/clients.md) — install in Claude, Copilot, Cursor, Antigravity, and other MCP clients
 - [docs/tools.md](docs/tools.md) — tool-by-tool reference with real examples
 - [docs/architecture.md](docs/architecture.md) — how the deterministic pipeline works
 - [docs/wordpress.md](docs/wordpress.md) — WordPress origin resolution guide
