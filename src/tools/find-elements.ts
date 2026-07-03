@@ -7,6 +7,7 @@
 import type { Protocol } from 'puppeteer-core'
 import { z } from 'zod'
 import type { ToolContext, ToolDef } from '../types.js'
+import { sanitizePageText } from '../types.js'
 import { selectorHelp } from '../engine/suggest.js'
 
 const OBJECT_GROUP = 'visionaire-find-elements'
@@ -40,6 +41,8 @@ interface MatchItem {
   classes: string[]
   id?: string
   text?: string
+  /** Absolute resolved destination for <a>/<area> — enables "browse the site" flows. */
+  href?: string
   x: number
   y: number
   w: number
@@ -129,6 +132,8 @@ function searchExpression(crit: z.infer<typeof argsSchema>): string {
     if (el.id) o.id = el.id;
     const t = textOf(el).slice(0, 30);
     if (t) o.text = t;
+    // el.href is the RESOLVED absolute URL (unlike getAttribute) — what a browsing agent needs.
+    if (typeof el.href === 'string' && el.href) o.href = el.href.slice(0, 160);
     return o;
   });
   return [JSON.stringify({ total: total, items: items })].concat(kept);
@@ -223,7 +228,8 @@ export const findElementsTool: ToolDef = {
           textPreview: item.text,
         })
         const text = item.text ? `"${item.text}" ` : ''
-        lines.push(`${uid} ${identityOf(item)} ${text}${item.w}x${item.h} @(${item.x},${item.y})`)
+        const href = item.href ? ` → ${sanitizePageText(item.href, 120)}` : ''
+        lines.push(`${uid} ${identityOf(item)} ${text}${item.w}x${item.h} @(${item.x},${item.y})${href}`)
       }
       const header =
         meta.total > lines.length

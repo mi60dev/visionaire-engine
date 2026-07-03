@@ -38,6 +38,12 @@ describe.skipIf(!hasChrome)('find_elements — forgiving matching (ask #6)', () 
   const run = (args: Record<string, unknown>): Promise<string> =>
     findElementsTool.handler(ctx, args).then((r) => r.text)
 
+  it('anchors report their resolved href — the "browse the site" primitive', async () => {
+    // cascade.html's .btn is <a href="#">; el.href resolves it against the page URL.
+    const text = await run({ role: 'link' })
+    expect(text).toMatch(/<a[.#][^>]*> "Get started" .*→ file:\/\/.*cascade\.html#/)
+  })
+
   it('match:"all" (default) intersects: the .btn does not contain "Limited offer"', async () => {
     // '.btn' is the "Get started" link; "Limited offer" lives in #promo-banner.
     // AND-combined, they contradict → no match.
