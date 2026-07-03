@@ -6,7 +6,7 @@
 
 An MCP server that gives LLMs deterministic "rendering truth" about live web pages, so they can debug CSS, design, and WordPress issues instead of guessing from screenshots.
 
-**Status: v0.5.** 20 tools, 259 tests (148 unit + 111 end-to-end on real Chrome) plus a 24-case seeded-bug benchmark (`npm run bench`), verified live against wordpress.org. New in v0.5: `inject_css` — the live fix loop (trial a fix on the page, see what changed, converge, write source once) — `navigate { bypassCache }` for stale-stylesheet hard reloads, and blast-radius + scoped-fix reporting on `explain_styles` (change THE button, not all buttons). v0.4 (field-report items): `interact` to drive the UI into a state and inspect it, `measure_element` for sub-pixel glyph/text-ink centering, and an `evaluate` escape hatch — plus element-scoped crops/zoom on `annotated_screenshot`, `match:"any"`/`visibleOnly:false` on `find_elements`, and zero-config cold-start Chrome discovery. v0.3 added the time dimension — event-listener attribution, animation diagnosis, and source-attributed interaction timelines. Hardened for untrusted pages (prompt-injection sanitization, fail-fast watchdog, dialog auto-dismiss).
+**Status: v0.6.** 22 tools, 276 tests (163 unit + 113 end-to-end on real Chrome) plus a 24-case seeded-bug benchmark (`npm run bench`), verified live against wordpress.org. New in v0.6 — the pixel-perfect pack: `check_alignment` (group alignment/gap-rhythm/grid/pixel-snap audit) and `pick_color` (actual painted-pixel sampling + WCAG contrast verdicts). v0.5: `inject_css` — the live fix loop (trial a fix on the page, see what changed, converge, write source once) — `navigate { bypassCache }` for stale-stylesheet hard reloads, and blast-radius + scoped-fix reporting on `explain_styles` (change THE button, not all buttons). v0.4 (field-report items): `interact` to drive the UI into a state and inspect it, `measure_element` for sub-pixel glyph/text-ink centering, and an `evaluate` escape hatch — plus element-scoped crops/zoom on `annotated_screenshot`, `match:"any"`/`visibleOnly:false` on `find_elements`, and zero-config cold-start Chrome discovery. v0.3 added the time dimension — event-listener attribution, animation diagnosis, and source-attributed interaction timelines. Hardened for untrusted pages (prompt-injection sanitization, fail-fast watchdog, dialog auto-dismiss).
 
 ## The problem
 
@@ -68,7 +68,7 @@ npm run demo                                              # bundled fixture
 npm run demo -- https://wordpress.org --selector "a.wp-block-button__link"
 ```
 
-## The 20 tools
+## The 22 tools
 
 | Tool | Purpose |
 |---|---|
@@ -86,6 +86,8 @@ npm run demo -- https://wordpress.org --selector "a.wp-block-button__link"
 | `record_interaction` | One interaction → a source-attributed causal timeline: handlers, mutations, cancelled transitions, layout shifts |
 | `interact` | Drive the UI into a state (open a menu/popup/modal, reveal a tab) and **leave it there** so you can inspect the new state — reports post-action visibility + box |
 | `measure_element` | Sub-pixel rendered geometry: content box + true text-ink box (glyph extents) with a centering verdict — "is this × actually centered?" |
+| `check_alignment` | Group pixel audit: which of N elements is off-alignment by how many px, gap-rhythm outliers, size consistency, N-px grid conformance, pixel-snap warnings |
+| `pick_color` | The actual painted pixel (composited truth: gradients, images, opacity) + computed colors + WCAG AA/AAA contrast verdict |
 | `evaluate` | Escape hatch: run agent-authored JavaScript in the page and get the JSON result, for the genuinely bespoke case no other tool covers |
 | `inject_css` | The live fix loop: trial declarations on an element (or a page-wide rule) without touching source — see what changed, converge, write source once, revert |
 | `annotated_screenshot` | Screenshot with numbered marks that equal snapshot uids — or an element-scoped crop via `clipTo` with `padding`/`scale` zoom and optional `annotate:false` |

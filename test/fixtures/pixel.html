@@ -1,0 +1,45 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Pixel-perfect fixture — misaligned nav + known colors</title>
+    <style>
+      body { margin: 0; font-family: Arial, sans-serif; }
+      .nav { position: relative; height: 120px; }
+      .nav a {
+        position: absolute;
+        top: 40px;
+        width: 80px;
+        height: 40px;
+        background: #dddddd;
+        text-align: center;
+        line-height: 40px;
+      }
+      /* even 24px rhythm … except one gap and one drop */
+      .n1 { left: 16px; }
+      .n2 { left: 120px; }
+      .nav .n3 { left: 224px; top: 43.5px; } /* sits 3.5px low — .nav .n3 outspecifies .nav a */
+      .n4 { left: 335px; }              /* gap +7px */
+      #swatch {
+        position: absolute;
+        top: 200px;
+        left: 16px;
+        width: 120px;
+        height: 60px;
+        background-color: #6c5ce7;
+        color: #ffffff;
+        line-height: 60px;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <nav class="nav">
+      <a class="n1" href="#">One</a>
+      <a class="n2" href="#">Two</a>
+      <a class="n3" href="#">Three</a>
+      <a class="n4" href="#">Four</a>
+    </nav>
+    <div id="swatch">Brand</div>
+  </body>
+</html>

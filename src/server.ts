@@ -8,7 +8,9 @@ import { z } from 'zod'
 import type { SessionManager } from './session.js'
 import type { ToolDef, ToolResult } from './types.js'
 import { annotatedScreenshotTool } from './tools/annotated-screenshot.js'
+import { checkAlignmentTool } from './tools/check-alignment.js'
 import { evaluateTool } from './tools/evaluate.js'
+import { pickColorTool } from './tools/pick-color.js'
 import { explainAnimationsTool } from './tools/explain-animations.js'
 import { explainStylesTool } from './tools/explain-styles.js'
 import { findElementsTool } from './tools/find-elements.js'
@@ -48,6 +50,10 @@ const DESCRIPTIONS: Record<string, string> = {
     "Screenshot in two modes: an overview with numbered marks burned in, where mark N equals uid eN (mark 17 = e17); or an element-scoped crop via clipTo (uid|selector|x,y) with optional padding, scale (0.5..4 zoom for tiny elements), and annotate:false for a clean unlabeled crop. Use when text tools are not enough and you need to SEE the page while keeping pixels tied to elements — spatial or visual-layout questions ('things overlap', 'the layout looks off'), to zoom in on one small element, or to confirm which element is which. Then target elements by their uid.",
   style_diff:
     "BEFORE/AFTER comparison for one element: record its styles into a named slot, change something, compare — only the properties that changed are reported. Reach for it whenever you ask 'did my fix actually change anything?' or need to prove what an edit / inject_css patch / viewport change / interaction altered. The loop: style_diff{mode:'record'} → apply the change → style_diff{mode:'compare'}. Confirms a fix moved exactly the property you intended, and nothing else.",
+  check_alignment:
+    "Pixel-perfect audit for a GROUP of elements (a selector's matches or a uid list): which edges/centers align and which element is off by how many px, gap rhythm with outliers ('gaps median 24px — e5→e6 is +7.5px'), size consistency, optional N-px grid conformance, and pixel-snap warnings (fractional device pixels render blurry). Reach for it on 'unevenly spaced', 'one card sits lower', 'the nav items look off', 'nothing lines up'. For ONE element's internal glyph centering use measure_element instead.",
+  pick_color:
+    "Sample the ACTUAL painted pixel at a point or element — the composited truth that computed styles cannot give (gradients, background images, opacity stacks, blend modes) — plus the owning element's computed color/background and a WCAG contrast verdict (AA/AAA) of the text against the painted backdrop. Reach for it on 'the color looks off', 'is this the exact brand hex?', 'is this text readable on that background?'. Use at:'top-left' to sample pure background (center may hit a glyph); use explain_styles to find WHICH RULE set a wrong color.",
   inject_css:
     "Apply CSS to the LIVE page without touching source files — either declarations trialed on one element (applied !important so the trial always wins; reports which computed properties changed) or a raw page-wide rule block. THE fix-loop tool: explain_styles names the winning rule → inject_css the candidate fix → verify with measure_element/style_diff/annotated_screenshot → write the final declarations into the source once → revert:'all'. This replaces the slow edit-file → cache-bust → reload → re-snapshot cycle. Also the quick way to hide a cookie/consent overlay that occludes what you need (inject 'display:none'). Patches are trial-only: gone on navigation or revert.",
   pick_element:
@@ -279,6 +285,8 @@ export function createServer(session: SessionManager): McpServer {
     measureElementTool,
     evaluateTool,
     injectCssTool,
+    checkAlignmentTool,
+    pickColorTool,
   ]
   for (const def of toolDefs) registerToolDef(server, session, def)
 

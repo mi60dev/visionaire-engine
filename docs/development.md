@@ -32,7 +32,7 @@ CDP protocol types come from `puppeteer-core` — there is no separate
 git clone <repo> && cd visionaire-engine
 npm install
 npm run build     # tsc → dist/
-npm test          # 259 tests; the e2e part auto-skips without Chrome
+npm test          # 276 tests; the e2e part auto-skips without Chrome
 ```
 
 ## Commands
@@ -40,7 +40,7 @@ npm test          # 259 tests; the e2e part auto-skips without Chrome
 | Command | What it runs | Notes |
 |---|---|---|
 | `npm run build` | `tsc -p tsconfig.json` | Emits `dist/` with declarations + source maps. `dist/index.js` is the `bin` entry. |
-| `npm test` | `vitest run` | All 21 test files. 60 s test/hook timeouts (browser startup headroom). |
+| `npm test` | `vitest run` | All 23 test files. 60 s test/hook timeouts (browser startup headroom). |
 | `npm run dev` | `tsx src/index.ts` | The MCP server from source, on stdio. It waits for an MCP client on stdin — see [Registering with MCP clients](#registering-with-mcp-clients) before wiring it up. |
 | `npm run bench` | `tsx bench/run.ts` | The 23-case seeded-bug benchmark on real headless Chrome — see [Benchmark](#benchmark). |
 | `npm run demo` | `tsx scripts/demo.ts` | CLI loop with no MCP client needed — see below. |
@@ -103,7 +103,7 @@ client, no build step (tsx runs TypeScript directly).
 
 ## Tests
 
-Twenty-one files, 259 tests total (148 pure unit + 111 e2e):
+Twenty-three files, 276 tests total (163 pure unit + 113 e2e):
 
 | File | Tests | Browser? | What it covers |
 |---|---|---|---|
@@ -120,6 +120,8 @@ Twenty-one files, 259 tests total (148 pure unit + 111 e2e):
 | `test/hardening.e2e.test.ts` | 3 | **real headless Chrome** | Untrusted-page posture against `fixtures/hostile.html`: dialog auto-dismiss (no dead-lock), injection-shaped text neutralized in output, zero-size custom element handled. |
 | `test/suggest.e2e.test.ts` | 4 | **real headless Chrome** | Near-miss selector suggestions: a guessed id/class that is not in the DOM returns the closest real names + a grounding nudge; malformed selectors report as invalid. |
 | `test/blast.e2e.test.ts` | 3 | **real headless Chrome** | Blast radius + scoped fix on `fixtures/blast.html`: shared `button` rule warns it styles 2 other buttons; `#cta` suggested with a specificity verdict; silent when the winner is already unique. |
+| `test/pixel.test.ts` | 12 | no | Pixel pack pure math: alignment clusters/gaps/grid/pixel-snap (`engine/alignment.ts`), WCAG color math (`engine/color.ts`), PNG decode on a handcrafted image (`engine/png.ts`). |
+| `test/pixel.e2e.test.ts` | 5 | **real headless Chrome** | `check_alignment` catches a 3.5px drop + 7px gap outlier on `fixtures/pixel.html`; `pick_color` reads the painted swatch (#6c5ce7) and issues the AA/AAA verdict. |
 | `test/geometry.test.ts` | — | no | Pure centering math for `measure_element` (`centeringDeltas`): centered ≈ 0, off-center signs, fix-hint wording. |
 | `test/coldstart.test.ts` | — | no | Puppeteer-cache Chrome discovery (`findPuppeteerCachedChrome`) against synthetic cache layouts. |
 | `test/interact.e2e.test.ts` | — | **real headless Chrome** | `interact` leaves post-action state in place: popup opens and stays inspectable; hover/focus paths. |
