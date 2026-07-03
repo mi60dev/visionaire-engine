@@ -22,33 +22,36 @@ import { recordInteractionTool } from './tools/record-interaction.js'
 import { styleDiffTool } from './tools/style-diff.js'
 
 /** When-to-use descriptions surfaced to the calling LLM; fall back to the ToolDef's own. */
+// Each description follows: WHAT it returns → WHEN to reach for it (concrete
+// user-voiced symptoms) → which sibling tool to use instead for the near-miss
+// case. This is what lets a calling LLM pick the right tool autonomously.
 const DESCRIPTIONS: Record<string, string> = {
   page_snapshot:
-    'Take a token-budgeted census of the rendered page: a nested element tree with stable uids, geometry, and visibility. Use this first to orient yourself and to obtain uids for every other tool.',
+    'Token-budgeted census of the rendered page — a nested, uid-keyed element tree with geometry and visibility flags. Call this FIRST after connect to orient yourself and to obtain the stable uids every other tool targets. Reach for it whenever you do not yet know the page structure or an element uid. To find one specific element by description use find_elements; to see the page visually use annotated_screenshot.',
   page_origins:
-    'Inventory every stylesheet on the page (URL, byte size, origin classification, source-map presence) and detect the platform: WordPress version, theme, page builders, optimizers. Use it to learn where the CSS comes from before proposing edits.',
+    "Inventory of every stylesheet (URL, byte size, origin, source-map presence) plus platform detection — WordPress version, theme/child theme, page builder (Elementor/Divi), and CSS optimizer. Use before proposing edits to learn where the CSS actually lives, when a file:line points at a generated/minified bundle and you need the true source, or to answer 'is this WordPress/Elementor?' and 'which stylesheet owns this?'.",
   inspect_element:
-    "Get the 'what' for one element: box model, key computed styles as authored → used pairs, visibility verdict, and layout context. Use when you need an element's current rendered state.",
+    "The 'WHAT' for one element: box model (margins/padding/border), key computed styles as authored → used values, a visibility verdict, and layout context. Use when you need an element's current rendered state — its real size, spacing, or whether it is actually visible/where it sits. For 'WHY it looks like this / which rule wins' use explain_styles; for 'which ancestor constrains its size or position' use inspect_ancestors.",
   explain_styles:
-    "Explain WHY an element looks the way it does: per-property cascade verdicts naming the winning declaration and each loser with the reason it lost, every rule attributed to its file:line or WordPress/database origin. Use this to find exactly which rule to edit.",
+    "The core 'WHY': a per-property cascade verdict naming the winning CSS declaration and every loser with the exact reason it lost (specificity, !important, source order, inline, layer), each attributed to file:line or a WordPress/Elementor/Customizer origin. Reach for this whenever a style is wrong or 'won't apply' — wrong color/font/size/spacing, 'something is overriding my rule', 'where does this value come from', 'which rule do I edit'. Pass an optional property (e.g. 'margin-bottom') to focus. This is the tool for style-cause questions.",
   inspect_ancestors:
-    'Walk the ancestor chain for one concern (width, height, position, overflow, or stacking) and flag the binding constraint. Use when an element is sized, clipped, or stacked by something above it.',
+    "Walk an element's ancestor chain for ONE concern — width, height, position, overflow, or stacking — and flag the ancestor that is the binding constraint. Use when the cause lives ABOVE the element: it's too wide/narrow, clipped or cut off, won't scroll, is mysteriously positioned, or a z-index has no effect (trapped in an ancestor's stacking context). Complements explain_styles, which explains the element's own winning rules.",
   find_elements:
-    'Deterministically search the page by text, CSS selector, role, and/or screen region, returning compact uid-keyed matches. Use to locate the element a user described before inspecting it.',
+    "Deterministic search by visible text, CSS selector, ARIA role, and/or screen region → compact uid-keyed matches. Use to locate the element a user described in words ('the Subscribe button', 'the header nav') before inspecting it. Prefer this (or page_snapshot) over guessing a selector. For a point in a screenshot use node_at_point; to have the human physically click the element use pick_element.",
   node_at_point:
-    'Map viewport coordinates (x, y) to the element at that point: uid, identity, and the full ancestor uid chain. Use to ground a spot in a screenshot to a concrete element.',
+    'Map viewport coordinates (x, y) to the element there: uid, identity, and the full ancestor uid chain. Use to turn a coordinate — e.g. a spot you located in an annotated_screenshot, or pixel coords the user gave — into a concrete element and uid.',
   annotated_screenshot:
-    'Capture a screenshot with numbered marks burned in; mark numbers equal snapshot uid numbers (mark 17 = uid e17). Use when you need to see the page and tie pixels back to elements.',
+    "Screenshot with numbered marks burned in, where mark N equals uid eN (mark 17 = e17). Use when text tools are not enough and you need to SEE the page while keeping pixels tied to elements — spatial or visual-layout questions ('things overlap', 'the layout looks off'), or to confirm which element is which. Then target elements by their uid.",
   style_diff:
-    "Record an element's styles into a named slot, then compare later and see only the changed properties. Use for verify-my-fix loops: record, apply the change, compare.",
+    "Record one element's styles into a named slot, then compare later to report only the properties that changed. Use for verify-my-fix loops (record → apply the edit → compare) and to see what a viewport change or an interaction altered. Confirms a fix actually moved the property you intended, and nothing else.",
   pick_element:
-    'Let the human point at the element: turns on a DevTools-style hover highlight in the connected tab and waits for them to click, returning the clicked element\'s uid and ancestor chain. Use when the user says "I\'ll show you" / "let me click it", or when find_elements/screenshot grounding failed to pin down the element. Needs a visible browser window (connect { headless: false }).',
+    'Let the human point at the element: turns on a DevTools-style hover highlight in the connected tab and waits for them to click, returning the clicked element\'s uid and ancestor chain. Use when the user says "I\'ll show you" / "let me click it", or when find_elements/annotated_screenshot could not pin down the element from a description. Needs a visible browser window (connect { headless: false }).',
   get_listeners:
-    'List the event listeners on an element — and, by default, delegated listeners up the ancestor chain, document, and window: event type, handler file:line (source-mapped, WordPress-origin-labeled), and the bug-prone flags capture/passive/once. Use to answer "which JS file handles this button?" or when a click/submit/keypress does nothing (a passive listener silently ignores preventDefault).',
+    'List the event listeners on an element — and, by default, delegated listeners up the ancestor chain, document, and window: event type, handler file:line (source-mapped, WordPress-origin-labeled), and the bug-prone flags capture/passive/once. Use to answer "which JS file handles this button?", or when a click/submit/keypress does nothing, a form won\'t submit, or preventDefault is ignored (often a passive listener). For what actually happens step-by-step when clicked, use record_interaction.',
   explain_animations:
-    'Explain the animations and transitions on one element: a census of what is running right now (type, play state, timing, animated properties) plus the declared transition/animation/@keyframes rules attributed to file:line, checked against a closed ruleset of known causes. Use when an animation or transition is not smooth, not running at all, or jumps instead of animating; pass the optional property (e.g. "opacity") to check why THAT property does not animate.',
+    'Explain the animations and transitions on one element: a census of what is running right now (type, play state, timing, animated properties) plus the declared transition/animation/@keyframes rules attributed to file:line, checked against a closed ruleset of known causes. Use when an animation or transition is not smooth, does not run at all, or jumps/pops instead of animating; pass the optional property (e.g. "opacity") to check why THAT property does not animate. For a timeline of a specific click/hover (what fired, what got cancelled), use record_interaction.',
   record_interaction:
-    'Observe what actually happens when an element is clicked or hovered (or while the human interacts manually): records one interaction and returns a source-attributed causal timeline — handler file:line, DOM mutations, animations started/cancelled, layout shifts, console errors — uid-keyed and coalesced. Use when you need to see cause and effect over time, e.g. "the sidebar does not hide smoothly" or "clicking the button does something wrong".',
+    'Perform one interaction (click or hover, or watch while the human interacts) and return a source-attributed causal TIMELINE — handler file:line, DOM/class mutations, animations started/cancelled, layout shifts, console errors — uid-keyed and time-ordered. Use for cause-and-effect over time: "the sidebar does not hide smoothly", "nothing/the wrong thing happens when I click", "the menu closes immediately", a modal that won\'t open, focus that jumps. For static listener attribution without triggering it, use get_listeners; for animation rules at rest, use explain_animations.',
 }
 
 function ok(text: string): CallToolResult {
@@ -154,7 +157,7 @@ export function createServer(session: SessionManager): McpServer {
     'connect',
     {
       description:
-        'Start (or restart) the browser session: launch a local Chrome by default, or attach to a running one via browserUrl (e.g. http://127.0.0.1:9222). Call this before any other tool; pass url to navigate immediately.',
+        'ALWAYS the first call: start (or restart) the browser session — launch a local Chrome by default, or attach to the user\'s real, logged-in browser via browserUrl (e.g. http://127.0.0.1:9222, for pages behind auth like wp-admin or a dashboard). Pass url to load a page immediately. Every other tool needs a live session; if a tool reports no session or a wedged browser, call connect again to reset.',
       inputSchema: {
         mode: z.enum(['launch', 'attach']).optional().describe("Default 'launch'; 'attach' joins a running Chrome"),
         url: z.string().optional().describe('Navigate here right after connecting'),
@@ -204,7 +207,7 @@ export function createServer(session: SessionManager): McpServer {
     'set_viewport',
     {
       description:
-        'Emulate a viewport size (and optional deviceScaleFactor) on the connected tab for responsive debugging, then re-inspect: media-query winners may change.',
+        "Emulate a viewport size (and optional deviceScaleFactor) on the connected tab, then re-inspect. Use for responsive bugs — 'it breaks on mobile', 'the menu is wrong at tablet width', anything behind a media query — since resizing can change which @media rule wins. Follow with a fresh page_snapshot / explain_styles at the new size.",
       inputSchema: {
         width: z.number().int().positive().describe('Viewport width in CSS px'),
         height: z.number().int().positive().describe('Viewport height in CSS px'),
