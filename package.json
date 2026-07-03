@@ -1,6 +1,6 @@
 {
   "name": "visionaire-engine",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Deterministic rendered-page → LLM context MCP server: which rule, which file, which line — and why it wins.",
   "type": "module",
   "bin": {
@@ -25,7 +25,7 @@
     "wordpress",
     "llm"
   ],
-  "license": "MIT",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "dependencies": {
     "@jridgewell/trace-mapping": "^0.3.31",
     "@modelcontextprotocol/sdk": "^1.29.0",
