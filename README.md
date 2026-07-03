@@ -134,7 +134,7 @@ Visionaire never executes page-authored code as instructions; it only reads and 
 **Dual-licensed — free for people, paid for companies:**
 
 - **Noncommercial use** (individuals, personal projects, hobby/study, charities, educational and public research institutions): free under the [PolyForm Noncommercial License 1.0.0](LICENSE).
-- **Commercial use** (use by or for a business, in paid work, or in any product or service): requires a commercial license. Contact [@mi60dev](https://github.com/mi60dev) (GitHub issue or profile) to obtain one.
+- **Commercial use** (use by or for a business, in paid work, or in any product or service): requires a commercial license — plans from $49/year, 30-day free evaluation. See **[COMMERCIAL.md](COMMERCIAL.md)**.
 
 Contributions are welcome, but note that by contributing you agree your contribution is licensed to the project owner under terms compatible with this dual-licensing model.
 
