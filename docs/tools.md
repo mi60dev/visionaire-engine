@@ -1,6 +1,6 @@
 # Tool reference
 
-Visionaire Engine exposes 16 MCP tools: three session tools (`connect`, `navigate`, `set_viewport`) and thirteen inspection tools — ten for the frozen moment (what the page looks like and why) and three for the time dimension (`get_listeners`, `explain_animations`, `record_interaction` — what happens and why). All output is plain text (plus one PNG for `annotated_screenshot`), deterministic, and token-budgeted. Concepts and vocabulary come from [architecture.md](architecture.md); this page documents the tools as implemented.
+Visionaire Engine exposes 19 MCP tools: three session tools (`connect`, `navigate`, `set_viewport`) and sixteen inspection tools — ten for the frozen moment (what the page looks like and why), three for the time dimension (`get_listeners`, `explain_animations`, `record_interaction` — what happens and why), plus three added in v0.4: `interact` (drive the UI into a state and leave it there), `measure_element` (sub-pixel glyph/text-ink centering), and `evaluate` (the escape hatch for genuinely bespoke reads). All output is plain text (plus one PNG for `annotated_screenshot`), deterministic, and token-budgeted. Concepts and vocabulary come from [architecture.md](architecture.md); this page documents the tools as implemented.
 
 ## Targeting elements
 
@@ -338,7 +338,7 @@ Identity lines follow the same `<tag#id.classes>` format as the other tools: the
 
 ## find_elements
 
-Deterministic page search — the grounding tool for "the button under the hero". Criteria are AND-combined; matching is exact and rule-based (no fuzzy matching — that stays with the calling LLM, which can search several times cheaply). Text matching is a case-insensitive substring test on normalized `innerText`, preferring elements whose *own* text nodes contain the needle and otherwise keeping only the deepest matches so wrappers do not shadow the real hit.
+Deterministic page search — the grounding tool for "the button under the hero". Criteria are AND-combined by default; pass `match: "any"` for a union (OR) when over-specifying returns nothing. Matching is exact and rule-based (no fuzzy matching — that stays with the calling LLM, which can search several times cheaply). Text matching is a case-insensitive substring test on normalized `innerText`, preferring elements whose *own* text nodes contain the needle and otherwise keeping only the deepest matches so wrappers do not shadow the real hit.
 
 | Parameter | Type | Default | Meaning |
 |---|---|---|---|
@@ -346,10 +346,11 @@ Deterministic page search — the grounding tool for "the button under the hero"
 | `selector` | string | — | CSS selector, matched via `querySelectorAll` |
 | `role` | string | — | ARIA role: explicit `[role]` attribute or tag-implied (`link`, `button`, `heading`, `navigation`, `textbox`, `list`, …) |
 | `region` | `{x, y, width, height}` | — | Viewport rectangle (CSS px) the element must intersect |
-| `visibleOnly` | boolean | `true` | Drop elements hidden by display/visibility/opacity |
+| `match` | `"all"` \| `"any"` | `"all"` | How the criteria combine: `all` = AND (intersection), `any` = OR (union). Use `any` when a precise combination of criteria returns nothing |
+| `visibleOnly` | boolean | `true` | Drop elements hidden by display/visibility/opacity. Set `false` to include `display:none`/hidden elements — honored in both `all` and `any` modes |
 | `limit` | integer 1–100 | `10` | Maximum matches returned |
 
-At least one of `text` / `selector` / `role` / `region` is required.
+At least one of `text` / `selector` / `role` / `region` is required. `match` and `visibleOnly` alone are not criteria.
 
 **Output** — a count header plus one compact line per match, in viewport coordinates:
 
@@ -358,7 +359,7 @@ At least one of `text` / `selector` / `role` / `region` is required.
 e5 <a.btn> "Get started" 146x42 @(40,142)
 ```
 
-When more matched than were shown: `27 elements found — showing first 10 (raise limit or narrow criteria):`. When nothing matched: `no elements matched (criteria are AND-combined; try visibleOnly: false or fewer criteria)`.
+When more matched than were shown: `27 elements found — showing first 10 (raise limit or narrow criteria):`. When nothing matched, the message names the recovery levers that actually apply — e.g. `match:"any"` when you are AND-combining more than one criterion, and `visibleOnly:false` when hidden elements might be excluded — and routes you to `page_snapshot`.
 
 ## node_at_point
 
@@ -386,6 +387,12 @@ A screenshot with numbered marks burned in — the bridge between pixels and uid
 | `uids` | string[] | top ~25 interactive/landmark elements | Uids to mark; unknown/detached uids are skipped and listed |
 | `region` | `{x, y, width > 0, height > 0}` | — | Clip to this viewport rectangle (CSS px). Mutually exclusive with `fullPage` |
 | `fullPage` | boolean | `false` | Capture the whole document, beyond the viewport |
+| `clipTo` | `{uid \| selector \| x,y}` | — | **Element-scoped crop**: clip the shot to one element's border box. Target by uid, selector, or a viewport point |
+| `padding` | number | `0` | `clipTo` only: extra pixels of margin around the cropped element on every side |
+| `scale` | number 0.5–4 | `1` | `clipTo` only: zoom factor for the crop (2 = double size) — enlarge a tiny element like an `×` so you can actually see it |
+| `annotate` | boolean | `true` | Set `false` for a clean, unlabelled crop so marks never cover the target |
+
+Two modes: the default **overview** marks interactive/landmark elements (or the `uids` you pass); **element-scoped** (`clipTo`) crops to one element's border box, optionally padded, zoomed via `scale`, and with `annotate:false` for a bare crop. `clipTo` is the right tool when you want to *see* one small element up close rather than orient over the whole page.
 
 **Output** — a text legend plus one PNG image content block:
 
@@ -524,7 +531,7 @@ notes:
   - no active animations in the getAnimations() census — JS requestAnimationFrame animations are invisible to this census — use record_interaction to observe the change happening
 ```
 
-`active now:` lists running animations with play state and timing; `declared:` carries the file:line + honesty-ladder bracket per declaration; each `findings:` line is one rule hit with a fix hint. Compositor status in v0.3 is the static R3 classification — authoritative trace-based failure reasons are a v0.4 item. Animations created purely from JS (`requestAnimationFrame` loops) are invisible to the census by nature; the R6 note says so explicitly and points at `record_interaction`.
+`active now:` lists running animations with play state and timing; `declared:` carries the file:line + honesty-ladder bracket per declaration; each `findings:` line is one rule hit with a fix hint. Compositor status is the static R3 classification — authoritative trace-based failure reasons remain future work. Animations created purely from JS (`requestAnimationFrame` loops) are invisible to the census by nature; the R6 note says so explicitly and points at `record_interaction`.
 
 ## record_interaction
 
@@ -555,6 +562,69 @@ t=123ms ✗ transition CANCELLED on e2 (width) — a style/display change remove
 
 Honesty notes are part of the format: CDP DOM events carry no timestamps, so `t=` offsets are best-effort and arrival order is authoritative; creation stacks cover node *insertions* only, so attribute/class mutations are labeled `(mutation attribution unavailable …)` — softened to "likely `script:line`" when exactly one script ran in that frame; LoAF script attribution names the entry-point function of same-origin scripts, not the whole call chain. Everything the recording window enables (mutation events, creation stacks, the Animation domain, the in-page `PerformanceObserver` buffer) is torn down when the tool returns, success or error.
 
+## interact
+
+Drive the UI into a state and **leave it there**. `interact` performs exactly one action at the target — click, hover, or focus — and does *not* record, tear anything down, or revert: a popup opened here stays open, so you can then `page_snapshot` / `inspect_element` / `annotated_screenshot` / `explain_styles` the resulting state. It reports the target's post-action visibility and content box so you learn immediately whether the action opened what you expected.
+
+This is the sibling of `record_interaction`: `record_interaction` opens the Animation/Debugger/mutation channels, captures a causal *timeline*, and tears every channel back down (often returning the page to its pre-interaction state); `interact` does the minimum and leaves you *in* the new state. Reach for `interact` to get somewhere ("open the menu, then tell me why it overflows"); reach for `record_interaction` to explain the transition itself.
+
+| Parameter | Type | Default | Meaning |
+|---|---|---|---|
+| `uid` / `selector` / `x`+`y` | TargetSpec | required | What to act on |
+| `action` | `'click' \| 'hover' \| 'focus'` | `'click'` | `hover` moves the mouse over the target; `focus` focuses it (falls back to in-page `el.focus()`) |
+| `settleMs` | number | `250` (clamped 0–5000) | How long to wait for the UI to react before reporting the target's new state |
+
+**Output** — a one-line verdict plus a re-snapshot nudge:
+
+```
+clicked e5 <button#trigger> — after 250ms: it is now visible 364x264 @(458,268).
+The page is now left in this new state. uids may have changed and new elements may have appeared — take a fresh page_snapshot to inspect the new state, then inspect_element / annotated_screenshot it.
+```
+
+The reported box is the **content box** (matching `inspect_element` / `measure_element`). After the settle wait, `interact` re-resolves the same target (a fresh `backendNodeId` if the DOM swapped the node) and reports its post-action state, falling back to the original node if the target vanished (e.g. a close button that removes itself). If the target has no clickable geometry (`display:none`, zero-size, detached), it errors and tells you to make it visible first.
+
+## measure_element
+
+Deterministic rendered-pixel geometry, for the questions the box model can't answer. `measure_element` reports an element's **content box** (WxH @x,y) and the true **text-ink bounding box** of its text — canvas `measureText` glyph extents (the painted ink, not the advance box), anchored to the text's painted position via a DOM Range — then a sub-pixel **centering verdict**: how far the ink center sits from the content-box center on each axis, with a padding/line-height fix hint. This answers "is this glyph *actually* centered?" without a hand-rolled CDP+canvas harness. Optionally pass a reference element to also get the center delta between the two elements.
+
+| Parameter | Type | Default | Meaning |
+|---|---|---|---|
+| `uid` / `selector` / `x`+`y` | TargetSpec | required | What to measure |
+| `referenceUid` | string | — | Optional reference element (by uid) to measure alignment against — reports the content-box-center delta |
+| `referenceSelector` | string | — | Optional reference element (by selector) to measure alignment against |
+
+**Output** — box, ink, and centering (the "close button × looks off-center" case):
+
+```
+element e2 <button.close> "×"
+content box: 30x30 @(1181,25)
+text ink: 6.8x6.8  font 16px "Arial"  text "×"
+centering (text ink vs content box):
+  horizontal: -8.3px (ink left of center)
+  vertical:   +0.3px (ink below center)
+  ink center 8.3px left of box center → shift content right 8.3px (e.g. adjust padding-right)
+```
+
+Because the content box already excludes padding and border, symmetric-looking box models can still hide a real *visual* offset — an off-center glyph shows up here as a non-zero ink delta even when `inspect_element` reports a perfectly square box. `explain_styles` tells you which rule set the value; `measure_element` tells you whether the painted glyph lands where you want. Deltas round to 0.1px; a value under 0.5px reads as centered. When the element has no text, the ink section reads `(no text to measure)` and only the content box and any reference delta are reported.
+
+## evaluate
+
+The explicit **escape hatch**. `evaluate` runs agent-authored JavaScript in the top-level frame and returns the JSON result — for the genuinely bespoke case that no purpose-built tool covers: a custom measurement, forcing a UI state (dispatch an event, toggle a class), or reading framework/component state. Prefer `explain_styles` / `measure_element` / `inspect_element` / `interact` where they apply; reach for `evaluate` only when none of them fits.
+
+| Parameter | Type | Default | Meaning |
+|---|---|---|---|
+| `expression` | string | required | JS evaluated in the page — an expression, a bare object literal (`{ w: innerWidth }`), or an IIFE for multi-step logic |
+| `awaitPromise` | boolean | `true` | If the expression yields a Promise, await it and return the resolved value |
+| `timeoutMs` | number | `5000` (clamped 100–30000) | Max run time before aborting |
+
+**Output** — the value as JSON:
+
+```
+{"w":1280,"h":800}
+```
+
+The JS is **trusted** — you wrote it — so unlike page-derived text elsewhere in the engine, the result is returned verbatim, *not* run through the page-text sanitizer (you asked for this data deliberately). It is size-capped (~6000 chars) and truncated with a note if larger. A bare `{ … }` object literal is auto-wrapped in parens so it evaluates to the object rather than a statement block. Values that don't JSON round-trip (a DOM node, `Map`, `Date`, `RegExp`, function, …) are described as `[non-serializable …]` rather than collapsed to `{}`; a runtime throw comes back as `evaluate error: <first line>`, and a timeout or a self-referential graph like `window` returns an actionable message telling you to project a smaller value.
+
 ---
 
 ## Recommended debugging flow
@@ -563,7 +633,8 @@ Honesty notes are part of the format: CDP DOM events carry no timestamps, so `t=
 2. **Orient: `page_snapshot`** — get the uid-keyed tree. If the user described an element in words, ground it with **`find_elements`** (`{ text: "Get started" }`); if you are working from a screenshot or a coordinate, use **`annotated_screenshot`** / **`node_at_point`**; if a human is looking at the tab and offers to point, **`pick_element`** lets them click the element directly. On WordPress or an unfamiliar stack, run **`page_origins`** once so you know what you will be attributing against (and whether an optimizer bundle needs bypassing).
 3. **What: `inspect_element`** — confirm the rendered reality: visibility verdict, real box, computed → used pairs. If the element is constrained/clipped/stacked by something above it, **`inspect_ancestors`** with the matching concern names the binding ancestor.
 4. **Why: `explain_styles`** — usually with `property:` once you know what is wrong (`{ uid: "e5", property: "margin-bottom" }`). The WINNER's `→ file:line [granularity | origin — edit hint]` is the edit target; check the notes for INACTIVE declarations and `@media`/`@layer` context before editing.
-5. **When the bug only happens on interaction** — "clicking does nothing" starts at **`get_listeners`** (who owns this event, or the honest "nobody does"); "it doesn't animate right" starts at **`explain_animations`** (`property:` set to what you expected to move); and when the static answers don't explain it, **`record_interaction`** on the trigger element captures the causal timeline of the interaction itself.
-6. **Verify: `style_diff`** — `{ uid: "e5", mode: "record" }`, apply the fix, `navigate` to reload (uids go stale, but the slot re-resolves by selector), then `{ mode: "compare" }`. The diff should contain exactly the properties you meant to change — nothing missing, nothing extra. For a behavioral fix, re-run `record_interaction` instead and compare timelines.
+5. **When the bug only happens on interaction** — "clicking does nothing" starts at **`get_listeners`** (who owns this event, or the honest "nobody does"); "it doesn't animate right" starts at **`explain_animations`** (`property:` set to what you expected to move); and when the static answers don't explain it, **`record_interaction`** on the trigger element captures the causal timeline of the interaction itself. When the bug lives in a state you have to *open* first — a menu, popup, modal, or revealed tab — **`interact`** drives the UI there and leaves it open so steps 3–4 can inspect the new state.
+6. **When the issue is visual alignment, not a rule** — a glyph or icon that "looks off-center" even though the box model is symmetric goes to **`measure_element`**, which reports the sub-pixel text-ink-vs-content-box offset that box tools can't see. And for the genuinely bespoke read that no tool covers, **`evaluate`** runs your own JavaScript in the page.
+7. **Verify: `style_diff`** — `{ uid: "e5", mode: "record" }`, apply the fix, `navigate` to reload (uids go stale, but the slot re-resolves by selector), then `{ mode: "compare" }`. The diff should contain exactly the properties you meant to change — nothing missing, nothing extra. For a behavioral fix, re-run `record_interaction` instead and compare timelines.
 
 Related reading: [architecture.md](architecture.md) (how the deterministic pipeline works), [wordpress.md](wordpress.md) (origin resolution details).

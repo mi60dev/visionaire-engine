@@ -34,9 +34,9 @@ const DESCRIPTIONS: Record<string, string> = {
   page_origins:
     "Inventory of every stylesheet (URL, byte size, origin, source-map presence) plus platform detection — WordPress version, theme/child theme, page builder (Elementor/Divi), and CSS optimizer. Use before proposing edits to learn where the CSS actually lives, when a file:line points at a generated/minified bundle and you need the true source, or to answer 'is this WordPress/Elementor?' and 'which stylesheet owns this?'.",
   inspect_element:
-    "The 'WHAT' for one element: box model (margins/padding/border), key computed styles as authored → used values, a visibility verdict, and layout context. Use when you need an element's current rendered state — its real size, spacing, or whether it is actually visible/where it sits. For 'WHY it looks like this / which rule wins' use explain_styles; for 'which ancestor constrains its size or position' use inspect_ancestors.",
+    "The 'WHAT' for one element: box model (margins/padding/border), key computed styles as authored → used values, a visibility verdict, and layout context. Use when you need an element's current rendered state — its real size, spacing, or whether it is actually visible/where it sits. These are the values the page ACTUALLY renders, so it catches the common case where the source rule you'd edit is overridden or never applied. For 'WHY it looks like this / which rule wins' use explain_styles; for 'which ancestor constrains its size or position' use inspect_ancestors.",
   explain_styles:
-    "The core 'WHY': a per-property cascade verdict naming the winning CSS declaration and every loser with the exact reason it lost (specificity, !important, source order, inline, layer), each attributed to file:line or a WordPress/Elementor/Customizer origin. Reach for this whenever a style is wrong or 'won't apply' — wrong color/font/size/spacing, 'something is overriding my rule', 'where does this value come from', 'which rule do I edit'. Pass an optional property (e.g. 'margin-bottom') to focus. This is the tool for style-cause questions.",
+    "The core 'WHY': a per-property cascade verdict naming the winning CSS declaration and every loser with the exact reason it lost (specificity, !important, source order, inline, layer), each attributed to file:line or a WordPress/Elementor/Customizer origin. Reach for this whenever a style is wrong or 'won't apply' — wrong color/font/size/spacing, 'something is overriding my rule', 'where does this value come from', 'which rule do I edit'. Prefer this over grepping the source for a style bug: source search finds candidate rules, but only the live cascade shows which one actually WINS on a layered stack — so diagnose here before editing CSS you assume is the cause. Pass an optional property (e.g. 'margin-bottom') to focus.",
   inspect_ancestors:
     "Walk an element's ancestor chain for ONE concern — width, height, position, overflow, or stacking — and flag the ancestor that is the binding constraint. Use when the cause lives ABOVE the element: it's too wide/narrow, clipped or cut off, won't scroll, is mysteriously positioned, or a z-index has no effect (trapped in an ancestor's stacking context). Complements explain_styles, which explains the element's own winning rules.",
   find_elements:
@@ -143,6 +143,16 @@ const SERVER_INSTRUCTIONS = [
   'visionaire-engine gives deterministic "why" facts about a LIVE web page: cascade winners with',
   'file:line, visibility causes, event-listener/animation/interaction attribution. No AI inside —',
   'you do the fuzzy reasoning.',
+  '',
+  'WHEN TO GO LIVE (do not skip this): for any bug about how something LOOKS or BEHAVES — wrong',
+  "color/size/spacing, misalignment, a style that 'won't apply' or is overridden, overlap, an",
+  'animation or interaction — inspect the RENDERED page here (explain_styles / inspect_element /',
+  'measure_element / interact) BEFORE editing source. On real stacks (plugin + parent + child theme,',
+  '!important, inline, Elementor, media queries) the source holds many candidate rules but only the',
+  'live cascade reveals which one WINS and where — a blind grep-and-edit frequently changes a rule',
+  "that isn't the winner and wastes a round-trip. Reading source alone is right only for a known,",
+  'unconditional edit (rename, add a comment, a value you are certain of). This tool is usually',
+  'faster than guessing from source for visual/behavioral bugs.',
   '',
   'Ground yourself BEFORE targeting elements — do not guess CSS selectors. A selector that is not in',
   'the live DOM just wastes a round-trip. Instead:',
