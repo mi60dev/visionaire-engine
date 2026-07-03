@@ -1,13 +1,14 @@
 # Visionaire Engine — Commercial Licensing
 
 Visionaire Engine is free for **noncommercial** use (individuals, hobby and study
-projects, charities, educational and public research institutions) under the
-[PolyForm Noncommercial License 1.0.0](LICENSE).
+projects, charities, educational, public research, and government institutions)
+under the [PolyForm Noncommercial License 1.0.0](LICENSE).
 
-**Any commercial use requires a commercial license** — that includes using it in
-paid work, inside a company (of any size), for client projects, or in any product
-or service. This page is the storefront; the full license agreement is provided at
-purchase.
+**Commercial use requires a commercial license** — in practice, any use in or for
+a for-profit business (of any size), in paid work, for client projects, or in any
+commercial product or service. This page is the storefront; the full agreement is
+published at [COMMERCIAL-LICENSE-AGREEMENT.md](COMMERCIAL-LICENSE-AGREEMENT.md)
+and is accepted by paying the invoice — no signature round-trip.
 
 ## Why pay for this?
 
@@ -30,9 +31,12 @@ no AI inside, works with Claude, Copilot, Cursor, and any MCP client.
 
 All prices per organization (Freelancer: per person), per year, USD.
 Introductory pricing — locked in for as long as your subscription stays active.
+"Developers" counts the people who run the tool — your employees or contractors,
+not your clients' staff ("Covered Users" in the
+[agreement](COMMERCIAL-LICENSE-AGREEMENT.md)).
 
-**Evaluation:** you may evaluate Visionaire commercially for **30 days** free of
-charge before deciding.
+**Evaluation:** one free **30-day** commercial evaluation per organization,
+starting on first commercial use — then buy a license or stop commercial use.
 
 ## What a commercial license includes
 
@@ -53,7 +57,9 @@ Payment links are being set up. Until then:
 
 1. Open a [commercial license request](https://github.com/mi60dev/visionaire-engine/issues/new?title=Commercial+license+request&labels=commercial)
    on GitHub (or contact [@mi60dev](https://github.com/mi60dev) directly), and
-2. you'll receive the license agreement and an invoice/payment link.
+2. you'll receive an invoice/payment link referencing the
+   [license agreement](COMMERCIAL-LICENSE-AGREEMENT.md) — read it first;
+   paying the invoice is what accepts it.
 
 ## FAQ
 
@@ -72,11 +78,11 @@ you point it at.
 **What happens if I don't renew?**
 You stop using the software commercially (or renew). Licenses are term-based.
 
-**Do students / teachers / researchers / charities pay?**
+**Do students / teachers / researchers / charities / government institutions pay?**
 No — you're already free under the PolyForm Noncommercial license.
 
 **Can I try before buying?**
-Yes — 30-day commercial evaluation, no registration required.
+Yes — one 30-day commercial evaluation per organization, no registration required.
 
 **Will you enforce this?**
 The license is the legal basis for invoicing organizations that use the tool.
@@ -92,4 +98,5 @@ No. Same code, same features — the difference is purely the license.
 ---
 
 *Prices and terms may be revised for new customers; active subscriptions keep
-their terms. This page is a summary, not the agreement itself.*
+their terms. This page is a summary — the binding terms are in
+[COMMERCIAL-LICENSE-AGREEMENT.md](COMMERCIAL-LICENSE-AGREEMENT.md).*

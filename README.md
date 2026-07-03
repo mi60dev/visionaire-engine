@@ -136,6 +136,6 @@ Visionaire never executes page-authored code as instructions; it only reads and 
 - **Noncommercial use** (individuals, personal projects, hobby/study, charities, educational and public research institutions): free under the [PolyForm Noncommercial License 1.0.0](LICENSE).
 - **Commercial use** (use by or for a business, in paid work, or in any product or service): requires a commercial license — plans from $49/year, 30-day free evaluation. See **[COMMERCIAL.md](COMMERCIAL.md)**.
 
-Contributions are welcome, but note that by contributing you agree your contribution is licensed to the project owner under terms compatible with this dual-licensing model.
+Contributions are welcome — by submitting one you accept the contributor license grant in [CONTRIBUTING.md](CONTRIBUTING.md), which lets the project owner keep dual-licensing the whole codebase (including your contribution) commercially.
 
 *Versions prior to v0.6.1 were published under MIT; that grant applies only to those historical versions.*
