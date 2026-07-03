@@ -32,7 +32,7 @@ CDP protocol types come from `puppeteer-core` — there is no separate
 git clone <repo> && cd visionaire-engine
 npm install
 npm run build     # tsc → dist/
-npm test          # 186 tests; the e2e part auto-skips without Chrome
+npm test          # 252 tests; the e2e part auto-skips without Chrome
 ```
 
 ## Commands
@@ -40,7 +40,7 @@ npm test          # 186 tests; the e2e part auto-skips without Chrome
 | Command | What it runs | Notes |
 |---|---|---|
 | `npm run build` | `tsc -p tsconfig.json` | Emits `dist/` with declarations + source maps. `dist/index.js` is the `bin` entry. |
-| `npm test` | `vitest run` | All 12 test files. 60 s test/hook timeouts (browser startup headroom). |
+| `npm test` | `vitest run` | All 20 test files. 60 s test/hook timeouts (browser startup headroom). |
 | `npm run dev` | `tsx src/index.ts` | The MCP server from source, on stdio. It waits for an MCP client on stdin — see [Registering with MCP clients](#registering-with-mcp-clients) before wiring it up. |
 | `npm run bench` | `tsx bench/run.ts` | The 23-case seeded-bug benchmark on real headless Chrome — see [Benchmark](#benchmark). |
 | `npm run demo` | `tsx scripts/demo.ts` | CLI loop with no MCP client needed — see below. |
@@ -103,7 +103,7 @@ client, no build step (tsx runs TypeScript directly).
 
 ## Tests
 
-Twelve files, 186 tests total (129 pure unit + 57 e2e):
+Twenty files, 252 tests total (145 pure unit + 107 e2e):
 
 | File | Tests | Browser? | What it covers |
 |---|---|---|---|
@@ -118,7 +118,15 @@ Twelve files, 186 tests total (129 pure unit + 57 e2e):
 | `test/interaction.e2e.test.ts` | 12 | **real headless Chrome** | `record_interaction` against `fixtures/sidebar.html`, served over a local `node:http` server (LoAF script attribution is empty on `file://` pages): the cancelled-transition verdict, handler attribution, mutation/layout-shift lines, teardown. |
 | `test/hardening.test.ts` | 8 | no | `sanitizePageText` (prompt-injection defense) and the `withWatchdog` fail-fast wrapper. |
 | `test/hardening.e2e.test.ts` | 3 | **real headless Chrome** | Untrusted-page posture against `fixtures/hostile.html`: dialog auto-dismiss (no dead-lock), injection-shaped text neutralized in output, zero-size custom element handled. |
-| `test/suggest.e2e.test.ts` | 4 | **real headless Chrome** | Near-miss selector suggestions: a guessed id/class that is not in the DOM returns the closest real names + a grounding nudge; malformed selectors report as invalid.
+| `test/suggest.e2e.test.ts` | 4 | **real headless Chrome** | Near-miss selector suggestions: a guessed id/class that is not in the DOM returns the closest real names + a grounding nudge; malformed selectors report as invalid. |
+| `test/geometry.test.ts` | — | no | Pure centering math for `measure_element` (`centeringDeltas`): centered ≈ 0, off-center signs, fix-hint wording. |
+| `test/coldstart.test.ts` | — | no | Puppeteer-cache Chrome discovery (`findPuppeteerCachedChrome`) against synthetic cache layouts. |
+| `test/interact.e2e.test.ts` | — | **real headless Chrome** | `interact` leaves post-action state in place: popup opens and stays inspectable; hover/focus paths. |
+| `test/measure.e2e.test.ts` | — | **real headless Chrome** | `measure_element` on `fixtures/glyph.html`: off-center glyph reports a nonzero delta + shift hint; centered control ≈ 0. |
+| `test/evaluate.e2e.test.ts` | — | **real headless Chrome** | `evaluate` escape hatch: expression/IIFE round-trips, promise awaiting, error surfacing, oversize truncation. |
+| `test/screenshot.e2e.test.ts` | — | **real headless Chrome** | `annotated_screenshot` element crops: `clipTo`+`padding`, `scale` zoom, `annotate:false` clean mode. |
+| `test/find.e2e.test.ts` | — | **real headless Chrome** | `find_elements` `match:'any'` union vs `'all'`, `visibleOnly:false` surfacing hidden elements, recovery hints. |
+| `test/inject.e2e.test.ts` | 5 | **real headless Chrome** | `inject_css` live fix loop: targeted `!important` trials with computed-change reporting, page-wide rules, clean revert, mode validation.
 
 
 The unit tests are pure functions over constructed data — they run in

@@ -14,6 +14,7 @@ import { explainStylesTool } from './tools/explain-styles.js'
 import { findElementsTool } from './tools/find-elements.js'
 import { getListenersTool } from './tools/get-listeners.js'
 import { inspectAncestorsTool } from './tools/inspect-ancestors.js'
+import { injectCssTool } from './tools/inject-css.js'
 import { inspectElementTool } from './tools/inspect-element.js'
 import { interactTool } from './tools/interact.js'
 import { measureElementTool } from './tools/measure-element.js'
@@ -46,7 +47,9 @@ const DESCRIPTIONS: Record<string, string> = {
   annotated_screenshot:
     "Screenshot in two modes: an overview with numbered marks burned in, where mark N equals uid eN (mark 17 = e17); or an element-scoped crop via clipTo (uid|selector|x,y) with optional padding, scale (0.5..4 zoom for tiny elements), and annotate:false for a clean unlabeled crop. Use when text tools are not enough and you need to SEE the page while keeping pixels tied to elements — spatial or visual-layout questions ('things overlap', 'the layout looks off'), to zoom in on one small element, or to confirm which element is which. Then target elements by their uid.",
   style_diff:
-    "Record one element's styles into a named slot, then compare later to report only the properties that changed. Use for verify-my-fix loops (record → apply the edit → compare) and to see what a viewport change or an interaction altered. Confirms a fix actually moved the property you intended, and nothing else.",
+    "BEFORE/AFTER comparison for one element: record its styles into a named slot, change something, compare — only the properties that changed are reported. Reach for it whenever you ask 'did my fix actually change anything?' or need to prove what an edit / inject_css patch / viewport change / interaction altered. The loop: style_diff{mode:'record'} → apply the change → style_diff{mode:'compare'}. Confirms a fix moved exactly the property you intended, and nothing else.",
+  inject_css:
+    "Apply CSS to the LIVE page without touching source files — either declarations trialed on one element (applied !important so the trial always wins; reports which computed properties changed) or a raw page-wide rule block. THE fix-loop tool: explain_styles names the winning rule → inject_css the candidate fix → verify with measure_element/style_diff/annotated_screenshot → write the final declarations into the source once → revert:'all'. This replaces the slow edit-file → cache-bust → reload → re-snapshot cycle. Also the quick way to hide a cookie/consent overlay that occludes what you need (inject 'display:none'). Patches are trial-only: gone on navigation or revert.",
   pick_element:
     'Let the human point at the element: turns on a DevTools-style hover highlight in the connected tab and waits for them to click, returning the clicked element\'s uid and ancestor chain. Use when the user says "I\'ll show you" / "let me click it", or when find_elements/annotated_screenshot could not pin down the element from a description. Needs a visible browser window (connect { headless: false }).',
   get_listeners:
@@ -162,6 +165,10 @@ const SERVER_INSTRUCTIONS = [
   '  3. you typically also have this project\'s SOURCE on disk — read it to find the actual class/id',
   '     names, template, and handler files before searching the page.',
   '',
+  'To TEST a candidate fix, do not edit files and reload: inject_css applies declarations to the live page',
+  '(revertable, !important trial) — verify with measure_element / style_diff, converge, THEN write the final',
+  'declarations into the source once. If a stale stylesheet keeps being served, navigate { bypassCache: true }.',
+  '',
   'Run this server from the project\'s root directory so the live page and the source you read line up.',
   'When a selector matches nothing, the error suggests the closest real ids/classes on the page.',
 ].join('\n')
@@ -209,13 +216,24 @@ export function createServer(session: SessionManager): McpServer {
     'navigate',
     {
       description:
-        'Navigate the connected tab to a URL. All element uids from earlier snapshots become stale — take a fresh page_snapshot afterwards.',
-      inputSchema: { url: z.string().describe('Absolute URL to load') },
+        'Navigate the connected tab to a URL — or, with no url, hard-reload the current page. Pass bypassCache: true when a stale cached stylesheet/script keeps being served (disables the browser cache for the rest of the session). All element uids from earlier snapshots become stale — take a fresh page_snapshot afterwards.',
+      inputSchema: {
+        url: z.string().optional().describe('Absolute URL to load; omit to reload the current page'),
+        bypassCache: z
+          .boolean()
+          .optional()
+          .describe('Disable the browser cache for the rest of the session (fresh CSS/JS on every load)'),
+      },
     },
     async (args): Promise<CallToolResult> => {
       try {
-        await session.navigate(args.url)
-        return ok(`navigated to ${session.context().page.url()} — previous uids are stale; take a fresh page_snapshot.`)
+        if (args.bypassCache) await session.disableCache()
+        if (args.url) await session.navigate(args.url)
+        else await session.reload(args.bypassCache === true)
+        const cacheNote = args.bypassCache ? ' (browser cache disabled for this session)' : ''
+        return ok(
+          `${args.url ? 'navigated to' : 'reloaded'} ${session.context().page.url()}${cacheNote} — previous uids are stale; take a fresh page_snapshot.`,
+        )
       } catch (err) {
         return errorResult(err)
       }
@@ -260,6 +278,7 @@ export function createServer(session: SessionManager): McpServer {
     interactTool,
     measureElementTool,
     evaluateTool,
+    injectCssTool,
   ]
   for (const def of toolDefs) registerToolDef(server, session, def)
 

@@ -314,6 +314,27 @@ export class SessionManager {
     }
   }
 
+  /**
+   * Disable the browser cache for the rest of the session — fresh CSS/JS on every
+   * load (field report: a stale cached stylesheet survived normal navigations).
+   */
+  async disableCache(): Promise<void> {
+    const { cdp } = this.context()
+    await cdp.send('Network.enable')
+    await cdp.send('Network.setCacheDisabled', { cacheDisabled: true })
+  }
+
+  /** Reload the current page (optionally ignoring the cache), with the same registry resync as navigate(). */
+  async reload(ignoreCache = false): Promise<void> {
+    const { page, cdp } = this.context()
+    if (ignoreCache) await this.disableCache()
+    await page.reload({ waitUntil: 'load' })
+    await cdp.send('CSS.disable')
+    await cdp.send('CSS.enable')
+    await cdp.send('Debugger.disable')
+    await enableDebugger(cdp)
+  }
+
   async navigate(url: string): Promise<void> {
     const { page, cdp } = this.context()
     await page.goto(url, { waitUntil: 'load' })
