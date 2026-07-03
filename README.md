@@ -4,6 +4,8 @@
 
 ![Visionaire Engine hero image](hero.png)
 
+![Endless re-prompting vs one pinpointed fix — the problem Visionaire solves](hero-2.jpeg)
+
 An MCP server that gives LLMs deterministic "rendering truth" about live web pages, so they can debug CSS, design, and WordPress issues instead of guessing from screenshots.
 
 **Status: v0.6.** 22 tools, 276 tests (163 unit + 113 end-to-end on real Chrome) plus a 24-case seeded-bug benchmark (`npm run bench`), verified live against wordpress.org. New in v0.6 — the pixel-perfect pack: `check_alignment` (group alignment/gap-rhythm/grid/pixel-snap audit) and `pick_color` (actual painted-pixel sampling + WCAG contrast verdicts). v0.5: `inject_css` — the live fix loop (trial a fix on the page, see what changed, converge, write source once) — `navigate { bypassCache }` for stale-stylesheet hard reloads, and blast-radius + scoped-fix reporting on `explain_styles` (change THE button, not all buttons). v0.4 (field-report items): `interact` to drive the UI into a state and inspect it, `measure_element` for sub-pixel glyph/text-ink centering, and an `evaluate` escape hatch — plus element-scoped crops/zoom on `annotated_screenshot`, `match:"any"`/`visibleOnly:false` on `find_elements`, and zero-config cold-start Chrome discovery. v0.3 added the time dimension — event-listener attribution, animation diagnosis, and source-attributed interaction timelines. Hardened for untrusted pages (prompt-injection sanitization, fail-fast watchdog, dialog auto-dismiss).
