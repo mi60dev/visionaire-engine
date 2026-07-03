@@ -4,7 +4,7 @@
 
 An MCP server that gives LLMs deterministic "rendering truth" about live web pages, so they can debug CSS, design, and WordPress issues instead of guessing from screenshots.
 
-**Status: v0.3.** 16 tools, 182 tests (129 unit + 53 end-to-end on real Chrome) plus a 23-case seeded-bug benchmark (`npm run bench`), verified live against wordpress.org. New in v0.3: the time dimension — event-listener attribution, animation diagnosis, and source-attributed interaction timelines. Hardened for untrusted pages (prompt-injection sanitization, fail-fast watchdog, dialog auto-dismiss).
+**Status: v0.4.** 19 tools, 247 tests (145 unit + 102 end-to-end on real Chrome) plus a 24-case seeded-bug benchmark (`npm run bench`), verified live against wordpress.org. New in v0.4 (field-report items): `interact` to drive the UI into a state and inspect it, `measure_element` for sub-pixel glyph/text-ink centering, and an `evaluate` escape hatch — plus element-scoped crops/zoom on `annotated_screenshot`, `match:"any"`/`visibleOnly:false` on `find_elements`, and zero-config cold-start Chrome discovery. v0.3 added the time dimension — event-listener attribution, animation diagnosis, and source-attributed interaction timelines. Hardened for untrusted pages (prompt-injection sanitization, fail-fast watchdog, dialog auto-dismiss).
 
 ## The problem
 
@@ -66,7 +66,7 @@ npm run demo                                              # bundled fixture
 npm run demo -- https://wordpress.org --selector "a.wp-block-button__link"
 ```
 
-## The 16 tools
+## The 19 tools
 
 | Tool | Purpose |
 |---|---|
@@ -76,13 +76,16 @@ npm run demo -- https://wordpress.org --selector "a.wp-block-button__link"
 | `inspect_element` | The "what": box model, computed values, visibility verdict |
 | `explain_styles` | **The wedge**: cascade winner/loser per property with file:line + origin attribution |
 | `inspect_ancestors` | Constraint-chain walk: which ancestor constrains width/overflow/stacking |
-| `find_elements` | Deterministic search by text, selector, role, or screen region |
+| `find_elements` | Deterministic search by text, selector, role, or screen region — AND-combined by default, `match:"any"` for a union, `visibleOnly:false` to include hidden elements |
 | `node_at_point` | x,y → element uid + ancestor chain |
 | `pick_element` | Human-in-the-loop grounding: DevTools-style hover highlight, the user clicks the element that looks wrong |
 | `get_listeners` | Event listeners on an element + its ancestors, with handler file:line and capture/passive/once flags |
 | `explain_animations` | Animations/transitions touching an element: live census, declared rules with file:line, and a closed "why is it not smooth" ruleset |
 | `record_interaction` | One interaction → a source-attributed causal timeline: handlers, mutations, cancelled transitions, layout shifts |
-| `annotated_screenshot` | Screenshot with numbered marks that equal snapshot uids |
+| `interact` | Drive the UI into a state (open a menu/popup/modal, reveal a tab) and **leave it there** so you can inspect the new state — reports post-action visibility + box |
+| `measure_element` | Sub-pixel rendered geometry: content box + true text-ink box (glyph extents) with a centering verdict — "is this × actually centered?" |
+| `evaluate` | Escape hatch: run agent-authored JavaScript in the page and get the JSON result, for the genuinely bespoke case no other tool covers |
+| `annotated_screenshot` | Screenshot with numbered marks that equal snapshot uids — or an element-scoped crop via `clipTo` with `padding`/`scale` zoom and optional `annotate:false` |
 | `style_diff` | Record styles, compare later — verify-my-fix loops |
 
 Full reference: [docs/tools.md](docs/tools.md)

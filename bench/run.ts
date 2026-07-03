@@ -51,6 +51,10 @@ const LAZY_TOOLS: Record<string, { specifier: string; exportName: string }> = {
     specifier: '../src/tools/record-interaction.js',
     exportName: 'recordInteractionTool',
   },
+  measure_element: {
+    specifier: '../src/tools/measure-element.js',
+    exportName: 'measureElementTool',
+  },
 }
 
 const lazyToolCache = new Map<string, ToolDef>()

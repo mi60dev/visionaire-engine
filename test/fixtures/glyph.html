@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>measure_element fixture — glyph centering (SPEC v0.4 field-report #3)</title>
+  <style>
+    body { margin: 0; font-family: Arial, sans-serif; }
+
+    /* Off-center close button: a "×" glyph in a 32x32 box that is left-aligned
+       inside its content box (text-align:left + a small text-indent), so the
+       glyph ink sits well left of the content-box center — the "looks off-center
+       in the button" bug the field report was fighting. */
+    button.close {
+      position: absolute;
+      left: 1180px;
+      top: 24px;
+      width: 32px;
+      height: 32px;
+      box-sizing: border-box;
+      padding: 0;
+      border: 1px solid #333;
+      background: #fff;
+      font: 16px/32px Arial;
+      text-align: left;
+      text-indent: 2px;
+      cursor: pointer;
+    }
+
+    /* Perfectly-centered control: same glyph, flex-centered with no asymmetry. */
+    button.ctrl {
+      position: absolute;
+      left: 100px;
+      top: 100px;
+      width: 40px;
+      height: 40px;
+      box-sizing: border-box;
+      padding: 0;
+      border: 1px solid #333;
+      background: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font: 20px/1 Arial;
+      cursor: pointer;
+    }
+
+    /* Reference target for alignment-vs-reference: a 40x40 box centered under
+       the control, offset horizontally so the center delta is non-trivial. */
+    #ref-box {
+      position: absolute;
+      left: 160px;
+      top: 100px;
+      width: 40px;
+      height: 40px;
+      background: #eee;
+    }
+  </style>
+</head>
+<body>
+  <button class="close" aria-label="Close">&times;</button>
+  <button class="ctrl">&times;</button>
+  <div id="ref-box"></div>
+</body>
+</html>

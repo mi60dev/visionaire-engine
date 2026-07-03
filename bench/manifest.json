@@ -212,5 +212,14 @@
     "serve": "http",
     "expected": ["opacity", "0s", "instant"],
     "notes": "Seeds the R4 finding (SPEC §14.3): `transition: opacity` declares the property but leaves transition-duration at its 0s default, so the change is instant by design. args.property carries the user's expectation ('should fade in' → opacity), which is what arms the R4 check. Empirically verified: computed transition-property=opacity, transition-duration=0s, and getAnimations() stays empty (zero-duration transitions never run), so the declared-half analysis must carry the case."
+  },
+  {
+    "id": 24,
+    "file": "cases/case24-glyph-offcenter.html",
+    "user_report": "The close button's × looks off-center — a bit too far to the left — even though the button is a perfect square with no padding.",
+    "target": { "selector": "button.close" },
+    "tool": "measure_element",
+    "expected": ["content box", "text ink", "horizontal:", "left of center", "shift content right"],
+    "notes": "The box model is symmetric (32x32, no padding asymmetry) so no box tool can see the offset; the glyph is pushed off-center by text-align:left + text-indent, an ink-relative offset. measure_element reports a non-zero horizontal ink-vs-content-box-center delta (empirically -8.3px for × in 16px Arial here) and a 'shift content right' fix hint. Markers assert the non-zero horizontal offset direction + fix hint without pinning the exact sub-pixel value, since actualBoundingBox glyph metrics vary slightly across Arial builds/platforms (per the measure_element builder's field notes)."
   }
 ]

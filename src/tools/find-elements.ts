@@ -22,6 +22,13 @@ const inputSchema = {
     .object({ x: z.number(), y: z.number(), width: z.number(), height: z.number() })
     .optional()
     .describe('Viewport rectangle (CSS px) the element must intersect'),
+  match: z
+    .enum(['all', 'any'])
+    .default('all')
+    .describe(
+      "'all' (default): AND — an element must satisfy every criterion. 'any': OR — union of elements " +
+        'matching any single criterion, de-duplicated. Use any when over-specifying returned nothing.',
+    ),
   visibleOnly: z.boolean().default(true),
   limit: z.number().int().min(1).max(100).default(10),
 }
@@ -66,27 +73,49 @@ function searchExpression(crit: z.infer<typeof argsSchema>): string {
     return map[t];
   };
   const root = document.body || document.documentElement;
-  let els = Array.from(crit.selector ? document.querySelectorAll(crit.selector) : root.querySelectorAll('*'));
-  if (crit.role) {
-    const want = crit.role.trim().toLowerCase();
-    els = els.filter((el) => roleOf(el) === want);
-  }
-  if (crit.region) {
+  const inRegion = (el) => {
     const g = crit.region;
-    els = els.filter((el) => {
-      const r = el.getBoundingClientRect();
-      return r.left < g.x + g.width && r.right > g.x && r.top < g.y + g.height && r.bottom > g.y;
-    });
-  }
-  if (crit.visibleOnly) els = els.filter(visible);
-  if (crit.text) {
-    const needle = crit.text.toLowerCase();
-    const matching = els.filter((el) => textOf(el).toLowerCase().includes(needle));
-    // Prefer elements whose OWN text nodes contain the needle; else keep only the deepest matches
-    // (drop any match that contains another match) so wrappers do not shadow the real hit.
-    const own = matching.filter((el) =>
-      Array.prototype.some.call(el.childNodes, (n) => n.nodeType === 3 && norm(n.textContent).toLowerCase().includes(needle)));
-    els = own.length ? own : matching.filter((el) => !matching.some((o) => o !== el && el.contains(o)));
+    const r = el.getBoundingClientRect();
+    return r.left < g.x + g.width && r.right > g.x && r.top < g.y + g.height && r.bottom > g.y;
+  };
+  const roleMatch = (el) => roleOf(el) === crit.role.trim().toLowerCase();
+  const anyMode = crit.match === 'any';
+  let els;
+  if (anyMode) {
+    // OR / union: an element qualifies if it satisfies ANY provided criterion.
+    // Seed the union with the exact selector hits (so a selector targeting body/html —
+    // which are not descendants of the scan root — still counts), then scan the subtree
+    // for text/role/region. A Set de-duplicates across arms; sort restores DOM order.
+    const needle = crit.text ? crit.text.toLowerCase() : null;
+    const union = new Set(crit.selector ? document.querySelectorAll(crit.selector) : []);
+    if (needle !== null || crit.role || crit.region) {
+      for (const el of root.querySelectorAll('*')) {
+        if (needle !== null && textOf(el).toLowerCase().includes(needle)) { union.add(el); continue; }
+        if (crit.role && roleMatch(el)) { union.add(el); continue; }
+        if (crit.region && inRegion(el)) { union.add(el); }
+      }
+    }
+    const all = document.querySelectorAll('*');
+    const order = new Map();
+    for (let i = 0; i < all.length; i++) order.set(all[i], i);
+    els = Array.from(union).sort((a, b) => (order.get(a) ?? 0) - (order.get(b) ?? 0));
+    // visibleOnly is a filter on the result, not a criterion — still honored in 'any' mode.
+    if (crit.visibleOnly) els = els.filter(visible);
+  } else {
+    // AND (default): progressively intersect. Behavior unchanged from pre-'match' find_elements.
+    els = Array.from(crit.selector ? document.querySelectorAll(crit.selector) : root.querySelectorAll('*'));
+    if (crit.role) els = els.filter(roleMatch);
+    if (crit.region) els = els.filter(inRegion);
+    if (crit.visibleOnly) els = els.filter(visible);
+    if (crit.text) {
+      const needle = crit.text.toLowerCase();
+      const matching = els.filter((el) => textOf(el).toLowerCase().includes(needle));
+      // Prefer elements whose OWN text nodes contain the needle; else keep only the deepest matches
+      // (drop any match that contains another match) so wrappers do not shadow the real hit.
+      const own = matching.filter((el) =>
+        Array.prototype.some.call(el.childNodes, (n) => n.nodeType === 3 && norm(n.textContent).toLowerCase().includes(needle)));
+      els = own.length ? own : matching.filter((el) => !matching.some((o) => o !== el && el.contains(o)));
+    }
   }
   const total = els.length;
   const kept = els.slice(0, crit.limit);
@@ -135,10 +164,15 @@ async function unpackNodeArray(
   return { metaJson, objectIds }
 }
 
+/** Count the criteria the caller actually supplied — >1 means AND-combining can over-specify. */
+function criterionCount(a: z.infer<typeof argsSchema>): number {
+  return (a.text ? 1 : 0) + (a.selector ? 1 : 0) + (a.role ? 1 : 0) + (a.region !== undefined ? 1 : 0)
+}
+
 export const findElementsTool: ToolDef = {
   name: 'find_elements',
   description:
-    'Deterministically search the page by text, CSS selector, role, and/or viewport region (criteria AND-combined). Returns compact uid-keyed matches for use with the other tools.',
+    'Deterministically search the page by text, CSS selector, role, and/or viewport region. Criteria are AND-combined by default; pass match:"any" for a union (OR) when over-specifying returns nothing. Returns compact uid-keyed matches for use with the other tools.',
   inputSchema,
   handler: async (ctx, args) => {
     const a = argsSchema.parse(args)
@@ -160,13 +194,21 @@ export const findElementsTool: ToolDef = {
       const meta = JSON.parse(metaJson) as { total: number; items: MatchItem[] }
 
       if (meta.total === 0) {
-        const hint = a.visibleOnly ? 'try visibleOnly: false or fewer criteria' : 'try fewer criteria'
-        // A guessed selector that matches nothing is the common failure — offer live near-misses.
+        // Actively suggest the recovery levers, tailored to what the caller actually set.
+        const combining = a.match === 'any' ? 'union (match:"any")' : 'AND-combined'
+        const recoveries: string[] = []
+        if (a.match !== 'any' && criterionCount(a) > 1) {
+          recoveries.push('loosen to match:"any" (union) or drop a criterion')
+        }
+        if (a.visibleOnly) recoveries.push('set visibleOnly:false to include display:none/hidden elements')
+        const recovery = recoveries.length ? ` To recover: ${recoveries.join('; ')}.` : ''
+        // A guessed selector that matches nothing is the common failure — offer live near-misses;
+        // both branches point at page_snapshot for real element names.
         const suggestion =
           typeof a.selector === 'string' && a.selector
             ? ` ${await selectorHelp(ctx, a.selector)}`
             : ' Take a page_snapshot to see the real element tree, or read the project source for actual names.'
-        return { text: `no elements matched (criteria are AND-combined; ${hint}).${suggestion}` }
+        return { text: `no elements matched (criteria are ${combining}).${recovery}${suggestion}` }
       }
 
       const lines: string[] = []

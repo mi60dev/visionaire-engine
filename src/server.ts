@@ -1,6 +1,6 @@
 /**
  * MCP server assembly: three session tools owned here (connect / navigate /
- * set_viewport) plus the thirteen ToolDef tools from src/tools/. SPEC §4, §11, §14.
+ * set_viewport) plus the sixteen ToolDef tools from src/tools/. SPEC §4, §11, §14.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
@@ -8,12 +8,15 @@ import { z } from 'zod'
 import type { SessionManager } from './session.js'
 import type { ToolDef, ToolResult } from './types.js'
 import { annotatedScreenshotTool } from './tools/annotated-screenshot.js'
+import { evaluateTool } from './tools/evaluate.js'
 import { explainAnimationsTool } from './tools/explain-animations.js'
 import { explainStylesTool } from './tools/explain-styles.js'
 import { findElementsTool } from './tools/find-elements.js'
 import { getListenersTool } from './tools/get-listeners.js'
 import { inspectAncestorsTool } from './tools/inspect-ancestors.js'
 import { inspectElementTool } from './tools/inspect-element.js'
+import { interactTool } from './tools/interact.js'
+import { measureElementTool } from './tools/measure-element.js'
 import { nodeAtPointTool } from './tools/node-at-point.js'
 import { pageOriginsTool } from './tools/page-origins.js'
 import { pageSnapshotTool } from './tools/page-snapshot.js'
@@ -37,11 +40,11 @@ const DESCRIPTIONS: Record<string, string> = {
   inspect_ancestors:
     "Walk an element's ancestor chain for ONE concern — width, height, position, overflow, or stacking — and flag the ancestor that is the binding constraint. Use when the cause lives ABOVE the element: it's too wide/narrow, clipped or cut off, won't scroll, is mysteriously positioned, or a z-index has no effect (trapped in an ancestor's stacking context). Complements explain_styles, which explains the element's own winning rules.",
   find_elements:
-    "Deterministic search by visible text, CSS selector, ARIA role, and/or screen region → compact uid-keyed matches. Use to locate the element a user described in words ('the Subscribe button', 'the header nav') before inspecting it. Prefer this (or page_snapshot) over guessing a selector. For a point in a screenshot use node_at_point; to have the human physically click the element use pick_element.",
+    "Deterministic search by visible text, CSS selector, ARIA role, and/or screen region → compact uid-keyed matches. Criteria are AND-combined by default; pass match:'any' for a union (OR) when over-specifying returns nothing, and visibleOnly:false to include display:none/hidden elements. Use to locate the element a user described in words ('the Subscribe button', 'the header nav') before inspecting it. Prefer this (or page_snapshot) over guessing a selector. For a point in a screenshot use node_at_point; to have the human physically click the element use pick_element.",
   node_at_point:
     'Map viewport coordinates (x, y) to the element there: uid, identity, and the full ancestor uid chain. Use to turn a coordinate — e.g. a spot you located in an annotated_screenshot, or pixel coords the user gave — into a concrete element and uid.',
   annotated_screenshot:
-    "Screenshot with numbered marks burned in, where mark N equals uid eN (mark 17 = e17). Use when text tools are not enough and you need to SEE the page while keeping pixels tied to elements — spatial or visual-layout questions ('things overlap', 'the layout looks off'), or to confirm which element is which. Then target elements by their uid.",
+    "Screenshot in two modes: an overview with numbered marks burned in, where mark N equals uid eN (mark 17 = e17); or an element-scoped crop via clipTo (uid|selector|x,y) with optional padding, scale (0.5..4 zoom for tiny elements), and annotate:false for a clean unlabeled crop. Use when text tools are not enough and you need to SEE the page while keeping pixels tied to elements — spatial or visual-layout questions ('things overlap', 'the layout looks off'), to zoom in on one small element, or to confirm which element is which. Then target elements by their uid.",
   style_diff:
     "Record one element's styles into a named slot, then compare later to report only the properties that changed. Use for verify-my-fix loops (record → apply the edit → compare) and to see what a viewport change or an interaction altered. Confirms a fix actually moved the property you intended, and nothing else.",
   pick_element:
@@ -52,6 +55,12 @@ const DESCRIPTIONS: Record<string, string> = {
     'Explain the animations and transitions on one element: a census of what is running right now (type, play state, timing, animated properties) plus the declared transition/animation/@keyframes rules attributed to file:line, checked against a closed ruleset of known causes. Use when an animation or transition is not smooth, does not run at all, or jumps/pops instead of animating; pass the optional property (e.g. "opacity") to check why THAT property does not animate. For a timeline of a specific click/hover (what fired, what got cancelled), use record_interaction.',
   record_interaction:
     'Perform one interaction (click or hover, or watch while the human interacts) and return a source-attributed causal TIMELINE — handler file:line, DOM/class mutations, animations started/cancelled, layout shifts, console errors — uid-keyed and time-ordered. Use for cause-and-effect over time: "the sidebar does not hide smoothly", "nothing/the wrong thing happens when I click", "the menu closes immediately", a modal that won\'t open, focus that jumps. For static listener attribution without triggering it, use get_listeners; for animation rules at rest, use explain_animations.',
+  interact:
+    'Perform ONE action (click/hover/focus) at a target and LEAVE the resulting state in place — no recording, no teardown. Use this to DRIVE the UI into a state — open a popup/menu/modal, reveal a tab or dropdown — so you can then inspect_element / annotated_screenshot / explain_styles the NEW state: "open the menu then tell me why it overflows", "click the tab and check the panel". Reports the target\'s post-action visibility + content box so you learn immediately whether it opened. Target by uid, selector, or x+y. For the causal TIMELINE of an interaction — which handler ran, what mutated, which transitions were cancelled — use record_interaction instead; interact only leaves you in the state, it does not explain the transition.',
+  measure_element:
+    'Deterministic rendered-pixel geometry: an element\'s content box (WxH @x,y) and the true TEXT INK bounding box of its glyphs (canvas measureText extents, not the advance box), plus a sub-pixel centering verdict — how far the ink sits from the content-box center on each axis, with a padding/line-height fix hint. Reach for this when the caller is fussing over VISUAL alignment that the box model can\'t see: "the × in the close button looks a bit high/off-center", "the icon is not quite centered", one-off pixel offsets. Pass referenceUid/referenceSelector to also get the center delta between two elements. explain_styles tells you which rule set the value; measure_element tells you whether the painted glyph actually lands where you want.',
+  evaluate:
+    'ESCAPE HATCH — run arbitrary agent-authored JavaScript in the page and get the JSON result. Use ONLY when no purpose-built tool covers the need: a custom measurement, forcing a UI state (dispatch an event / toggle a class), or reading framework/component state. Prefer explain_styles / measure_element / inspect_element / interact where they apply — reach for evaluate when the question is genuinely bespoke and none of them fits. The JS is trusted (you wrote it); its result is returned verbatim and size-capped.',
 }
 
 function ok(text: string): CallToolResult {
@@ -238,6 +247,9 @@ export function createServer(session: SessionManager): McpServer {
     getListenersTool,
     explainAnimationsTool,
     recordInteractionTool,
+    interactTool,
+    measureElementTool,
+    evaluateTool,
   ]
   for (const def of toolDefs) registerToolDef(server, session, def)
 

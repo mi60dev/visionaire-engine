@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>case24 — glyph looks off-center in the close button</title>
+  <style>
+    body { margin: 0; font-family: Arial, sans-serif; }
+
+    /* Close button whose "×" glyph is pushed left of the content-box center via
+       text-align:left + text-indent — the box model looks perfect (32x32, no
+       padding asymmetry) yet the painted glyph visibly sits off to one side.
+       measure_element should report a non-zero horizontal ink-vs-center delta. */
+    button.close {
+      position: absolute;
+      left: 1180px;
+      top: 24px;
+      width: 32px;
+      height: 32px;
+      box-sizing: border-box;
+      padding: 0;
+      border: 1px solid #333;
+      background: #fff;
+      font: 16px/32px Arial;
+      text-align: left;
+      text-indent: 2px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <button class="close" aria-label="Close">&times;</button>
+</body>
+</html>

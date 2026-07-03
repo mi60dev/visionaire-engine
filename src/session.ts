@@ -4,6 +4,7 @@
  */
 import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import puppeteer from 'puppeteer-core'
 import type { Browser, CDPSession, LaunchOptions, Page, Protocol } from 'puppeteer-core'
@@ -21,6 +22,66 @@ const MACOS_CHROME_PATHS = [
 const LINUX_CHROME_NAMES = ['google-chrome', 'google-chrome-stable', 'chromium', 'chromium-browser']
 
 /**
+ * Resolve a Chrome/Chrome-for-Testing binary inside a puppeteer browser cache, or
+ * undefined. `@puppeteer/browsers install chrome` lays the cache out as
+ *   <baseDir>/<version>/<platform>/<binary>
+ * e.g. `~/.cache/puppeteer/chrome/mac_arm-132.0.6834.110/chrome-mac-arm64/Google Chrome for Testing.app/…`
+ * (verified empirically on this machine). The <platform> segment carries an arch
+ * suffix that varies (mac-arm64 | mac-x64 | linux64 | win64), so we read it back
+ * rather than hardcode it. Versions sort descending (string) so the newest wins.
+ * Dependency-free (no glob lib); every fs call is guarded so a torn/foreign cache
+ * layout degrades to undefined instead of throwing.
+ */
+export function findPuppeteerCachedChrome(baseDir: string): string | undefined {
+  let versions: string[]
+  try {
+    versions = fs.readdirSync(baseDir)
+  } catch {
+    return undefined // baseDir missing or unreadable
+  }
+  // Newest version wins by descending string sort (e.g. 132.* before 131.*).
+  versions.sort((a, b) => (a < b ? 1 : a > b ? -1 : 0))
+
+  for (const version of versions) {
+    const versionDir = path.join(baseDir, version)
+    let platformDirs: string[]
+    try {
+      platformDirs = fs.readdirSync(versionDir)
+    } catch {
+      continue // not a directory / unreadable — skip
+    }
+    for (const platformDir of platformDirs) {
+      const root = path.join(versionDir, platformDir)
+      const binary =
+        process.platform === 'darwin'
+          ? path.join(root, 'Google Chrome for Testing.app', 'Contents', 'MacOS', 'Google Chrome for Testing')
+          : process.platform === 'win32'
+            ? path.join(root, 'chrome.exe')
+            : path.join(root, 'chrome')
+      try {
+        if (fs.existsSync(binary)) return binary
+      } catch {
+        // fall through to the next platform/version
+      }
+    }
+  }
+  return undefined
+}
+
+/** Puppeteer cache roots to scan, honoring $PUPPETEER_CACHE_DIR, else ~/.cache/puppeteer/chrome. */
+function puppeteerCacheChromeDirs(): string[] {
+  const dirs: string[] = []
+  const override = process.env['PUPPETEER_CACHE_DIR']
+  if (override) dirs.push(path.join(override, 'chrome'))
+  try {
+    dirs.push(path.join(os.homedir(), '.cache', 'puppeteer', 'chrome'))
+  } catch {
+    // homedir() can throw in exotic environments — the override (if any) still stands.
+  }
+  return dirs
+}
+
+/**
  * Debugger.enable must always be followed by setSkipAllPauses: with the domain
  * enabled, a page-side `debugger;` statement would otherwise freeze the tab —
  * and the skip flag does NOT survive a Debugger.disable/enable toggle
@@ -35,6 +96,20 @@ export function findChromeExecutable(): string | undefined {
   const envPath = process.env['CHROME_PATH']
   if (envPath && fs.existsSync(envPath)) return envPath
 
+  // A system Chrome always wins first (below); the puppeteer cache is the last-resort
+  // fallback so a `@puppeteer/browsers install` cold-start "just works" (field report #5).
+  const systemChrome = findSystemChrome()
+  if (systemChrome) return systemChrome
+
+  for (const baseDir of puppeteerCacheChromeDirs()) {
+    const cached = findPuppeteerCachedChrome(baseDir)
+    if (cached) return cached
+  }
+  return undefined
+}
+
+/** Standard OS install locations for a real Chrome/Chromium (no puppeteer cache). */
+function findSystemChrome(): string | undefined {
   if (process.platform === 'darwin') {
     return MACOS_CHROME_PATHS.find((p) => fs.existsSync(p))
   }
@@ -142,10 +217,12 @@ export class SessionManager {
       const executablePath = findChromeExecutable()
       if (!executablePath) {
         throw new Error(
-          'No Chrome/Chromium found. puppeteer-core does not bundle a browser — install one, then retry:\n' +
+          'No Chrome/Chromium found. puppeteer-core does not bundle a browser — install one, then retry.\n' +
+            'Auto-checked: $CHROME_PATH, standard OS install locations, and the puppeteer browser cache ' +
+            '($PUPPETEER_CACHE_DIR or ~/.cache/puppeteer/chrome).\n' +
             '  • Debian/Ubuntu/WSL: download Google Chrome and `sudo apt-get install -y ./google-chrome-stable_current_amd64.deb`\n' +
             '    (from https://www.google.com/chrome/) — apt pulls in the required system libraries.\n' +
-            '  • or: `npx @puppeteer/browsers install chrome@stable`, then set CHROME_PATH to the printed binary path.\n' +
+            '  • or: `npx @puppeteer/browsers install chrome@stable` — the cached binary is then discovered automatically.\n' +
             '  • or point CHROME_PATH at any existing Chrome/Chromium binary.\n' +
             '  • or use mode:"attach" with browserUrl against a Chrome started with --remote-debugging-port.',
         )

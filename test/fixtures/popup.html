@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Popup fixture — interact (drive-to-state)</title>
+<style>
+  body { margin: 0; font-family: sans-serif; }
+  .bar { padding: 40px; }
+  #trigger { padding: 10px 20px; font-size: 16px; cursor: pointer; }
+  /* The overlay starts hidden; clicking #trigger flips it to display:block. */
+  .popup {
+    display: none;
+    position: fixed;
+    top: 100px;
+    left: 120px;
+    width: 400px;
+    height: 300px;
+    box-sizing: border-box;
+    padding: 16px;
+    background: #ffffff;
+    border: 2px solid #333;
+  }
+  .popup.open { display: block; }
+  .popup .close {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 28px;
+    height: 28px;
+    cursor: pointer;
+  }
+  #focusable { margin-top: 20px; }
+</style>
+</head>
+<body>
+<div class="bar">
+  <button id="trigger">Open popup</button>
+  <input id="focusable" type="text" placeholder="focus target">
+</div>
+
+<div class="popup" id="popup" role="dialog" aria-label="Example popup">
+  <button class="close" id="close" aria-label="Close">x</button>
+  <h2>Popup</h2>
+  <p>This overlay was hidden (display:none) until the trigger was clicked.</p>
+</div>
+
+<script>
+  var popup = document.getElementById('popup');
+  document.getElementById('trigger').addEventListener('click', function () {
+    popup.classList.add('open');
+  });
+  document.getElementById('close').addEventListener('click', function () {
+    popup.classList.remove('open');
+  });
+</script>
+</body>
+</html>
