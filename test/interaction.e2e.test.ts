@@ -162,6 +162,12 @@ describe.skipIf(!chromePath)('record_interaction e2e — real Chrome over local 
     server = http.createServer((req, res) => {
       const rel = (req.url === '/' ? '/sidebar.html' : (req.url ?? '/')).split('?')[0]!
       const file = path.join(fixturesDir, path.normalize(rel))
+      // Containment guard: a fixture request must resolve inside fixturesDir (path-traversal barrier).
+      if (file !== fixturesDir && !file.startsWith(fixturesDir + path.sep)) {
+        res.writeHead(403)
+        res.end()
+        return
+      }
       let body: Buffer
       try {
         body = fs.readFileSync(file)
