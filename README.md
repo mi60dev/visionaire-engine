@@ -4,21 +4,36 @@
 
 ![Visionaire Engine hero image](hero.png)
 
+**The problem:** Something looks off. You screenshot it, explain it, the LLM guesses wrong, you re-explain.
+
+**The solution:** Visionaire reads the live page and hands the LLM the exact rule, file, and line. Right fix, first try.
+
 ![Endless re-prompting vs one pinpointed fix — the problem Visionaire solves](hero-2.jpeg)
 
-An MCP server that gives LLMs deterministic "rendering truth" about live web pages, so they can debug CSS, design, and WordPress issues instead of guessing from screenshots.
+**You shouldn't have to write a paragraph to explain a 2px margin bug — and now you don't.** Less explaining, more fixing: built for developers, vibe coders, and anyone shipping site design changes with an LLM in the loop.
 
-**Status: v0.6.** 22 tools, 276 tests (163 unit + 113 end-to-end on real Chrome) plus a 24-case seeded-bug benchmark (`npm run bench`), verified live against wordpress.org. New in v0.6 — the pixel-perfect pack: `check_alignment` (group alignment/gap-rhythm/grid/pixel-snap audit) and `pick_color` (actual painted-pixel sampling + WCAG contrast verdicts). v0.5: `inject_css` — the live fix loop (trial a fix on the page, see what changed, converge, write source once) — `navigate { bypassCache }` for stale-stylesheet hard reloads, and blast-radius + scoped-fix reporting on `explain_styles` (change THE button, not all buttons). v0.4 (field-report items): `interact` to drive the UI into a state and inspect it, `measure_element` for sub-pixel glyph/text-ink centering, and an `evaluate` escape hatch — plus element-scoped crops/zoom on `annotated_screenshot`, `match:"any"`/`visibleOnly:false` on `find_elements`, and zero-config cold-start Chrome discovery. v0.3 added the time dimension — event-listener attribution, animation diagnosis, and source-attributed interaction timelines. Hardened for untrusted pages (prompt-injection sanitization, fail-fast watchdog, dialog auto-dismiss).
+**Status: v0.6** — 22 tools, 276 tests (163 unit + 113 end-to-end on real Chrome), a 24-case seeded-bug benchmark (`npm run bench`), verified live against wordpress.org.
 
-## The problem
+<details>
+<summary><strong>What's new, by version</strong></summary>
 
-When you see a visual bug and ask an LLM to fix it, the LLM gets either pixels (no code linkage) or code (no rendering truth). Existing browser MCPs ship accessibility snapshots that deliberately strip all styling. The missing layer is **explanation and attribution**:
+- **v0.6 — the pixel-perfect pack:** `check_alignment` (group alignment / gap-rhythm / grid / pixel-snap audit) and `pick_color` (actual painted-pixel sampling + WCAG contrast verdicts)
+- **v0.5:** `inject_css` — the live fix loop (trial a fix on the page, see what changed, converge, write source once); `navigate { bypassCache }` for stale-stylesheet hard reloads; blast-radius + scoped-fix reporting on `explain_styles` (change *the* button, not all buttons)
+- **v0.4 (field-report items):** `interact` to drive the UI into a state and inspect it; `measure_element` for sub-pixel glyph/text-ink centering; an `evaluate` escape hatch; element-scoped crops/zoom on `annotated_screenshot`; `match:"any"` / `visibleOnly:false` on `find_elements`; zero-config cold-start Chrome discovery
+- **v0.3:** the time dimension — event-listener attribution, animation diagnosis, source-attributed interaction timelines
+- **Hardened for untrusted pages:** prompt-injection sanitization, fail-fast watchdog, dialog auto-dismiss
+
+</details>
+
+## The gap
+
+Ask an LLM to fix a visual bug today and it gets one of two incomplete pictures: pixels, with no link back to code, or code, with no rendering truth about what's actually winning on screen. Existing browser MCPs make this worse for design work specifically — they ship accessibility snapshots that deliberately strip out all styling. What's missing is **explanation and attribution**:
 
 - *Which* CSS rule wins the cascade for this property, and why did the others lose?
 - *Which file, which line* does the winner live in — or which Elementor widget control, or which Customizer entry?
-- *Why* is this element invisible / misaligned / the wrong size?
+- *Why* is this element invisible, misaligned, or the wrong size?
 
-Visionaire Engine answers those questions with zero AI inside: everything is computed deterministically from the Chrome DevTools Protocol plus closed rulesets. The fuzzy work (matching "the button under the hero looks off" to an element) stays with the calling LLM, which gets uid-keyed snapshots, search tools, and annotated screenshots to do it cheaply.
+Visionaire answers those questions with zero AI inside — everything is computed deterministically from the Chrome DevTools Protocol plus closed rulesets. The fuzzy part (matching "the button under the hero looks off" to an actual element) stays with the calling LLM, which gets uid-keyed snapshots, search tools, and annotated screenshots to do that cheaply.
 
 ## What the output looks like
 
@@ -47,20 +62,14 @@ npm install && npm run build
 claude mcp add visionaire -- node /absolute/path/to/visionaire-engine/dist/index.js
 ```
 
-Using **GitHub Copilot, Cursor, Claude Desktop, Google Antigravity**, or another
-client? See **[docs/clients.md](docs/clients.md)** for a copy-paste config for each,
-plus browser-install help for Linux/WSL/Docker.
+Using **GitHub Copilot, Cursor, Claude Desktop, Google Antigravity**, or another client? See **[docs/clients.md](docs/clients.md)** for a copy-paste config for each, plus browser-install help for Linux/WSL/Docker.
 
-**Run it from your project's root directory** — visionaire is at its best when the
-agent has both the running site *and* its source on disk, so it can cross-reference
-the two. Ground before you search: take a `page_snapshot` (or read the source) to
-get real element names instead of guessing selectors. If a selector matches
-nothing, the error suggests the closest real ids/classes on the page.
+**Run it from your project's root directory** — Visionaire is at its best when the agent has both the running site *and* its source on disk, so it can cross-reference the two. Ground before you search: take a `page_snapshot` (or read the source) to get real element names instead of guessing selectors. If a selector matches nothing, the error suggests the closest real ids/classes on the page.
 
-Then in a session:
+Then, in a session:
 
-1. `connect { url: "https://your-site.com" }` — launches Chrome (or `{ browserUrl: "http://127.0.0.1:9222" }` to attach to your real logged-in browser)
-2. `page_snapshot {}` — uid-keyed census of what's visible; **target elements by their `uid`**, not invented selectors
+1. `connect { url: "https://your-site.com" }` — launches Chrome (or `{ browserUrl: "http://127.0.0.1:9222" }` to attach to your real, logged-in browser)
+2. `page_snapshot {}` — a uid-keyed census of what's visible; **target elements by their `uid`**, not invented selectors
 3. `explain_styles { uid: "e17", property: "margin-bottom" }` — cascade verdict with file:line
 
 Try it without an MCP client:
@@ -72,28 +81,50 @@ npm run demo -- https://wordpress.org --selector "a.wp-block-button__link"
 
 ## The 22 tools
 
+**Session & grounding** — get connected and find the right element without guessing.
+
 | Tool | Purpose |
 |---|---|
-| `connect` / `navigate` / `set_viewport` | Session: launch or attach to Chrome, go to a URL (`bypassCache` for hard reloads), emulate viewports |
+| `connect` / `navigate` / `set_viewport` | Launch or attach to Chrome, go to a URL (`bypassCache` for hard reloads), emulate viewports |
 | `page_snapshot` | Pruned, uid-keyed tree of what's visible — geometry, layout hints, invisibility reasons |
 | `page_origins` | Stylesheet inventory + platform detection (WordPress version, theme, builders, optimizers) |
-| `inspect_element` | The "what": box model, computed values, visibility verdict |
-| `explain_styles` | **The wedge**: cascade winner/loser per property with file:line + origin attribution, each winner's **blast radius** (how many other elements it styles), and a scoped-fix selector for just this element |
-| `inspect_ancestors` | Constraint-chain walk: which ancestor constrains width/overflow/stacking |
 | `find_elements` | Deterministic search by text, selector, role, or screen region — AND-combined by default, `match:"any"` for a union, `visibleOnly:false` to include hidden elements |
 | `node_at_point` | x,y → element uid + ancestor chain |
 | `pick_element` | Human-in-the-loop grounding: DevTools-style hover highlight, the user clicks the element that looks wrong |
+
+**Explanation** — the "why," with a receipt.
+
+| Tool | Purpose |
+|---|---|
+| `inspect_element` | The "what": box model, computed values, visibility verdict |
+| `explain_styles` | **The wedge.** Cascade winner/loser per property with file:line + origin attribution, each winner's **blast radius** (how many other elements it styles), and a scoped-fix selector for just this element |
+| `inspect_ancestors` | Constraint-chain walk: which ancestor constrains width/overflow/stacking |
 | `get_listeners` | Event listeners on an element + its ancestors, with handler file:line and capture/passive/once flags |
 | `explain_animations` | Animations/transitions touching an element: live census, declared rules with file:line, and a closed "why is it not smooth" ruleset |
-| `record_interaction` | One interaction → a source-attributed causal timeline: handlers, mutations, cancelled transitions, layout shifts |
-| `interact` | Drive the UI into a state (open a menu/popup/modal, reveal a tab) and **leave it there** so you can inspect the new state — reports post-action visibility + box |
+
+**Pixel-level checks** — new in v0.6.
+
+| Tool | Purpose |
+|---|---|
 | `measure_element` | Sub-pixel rendered geometry: content box + true text-ink box (glyph extents) with a centering verdict — "is this × actually centered?" |
 | `check_alignment` | Group pixel audit: which of N elements is off-alignment by how many px, gap-rhythm outliers, size consistency, N-px grid conformance, pixel-snap warnings |
 | `pick_color` | The actual painted pixel (composited truth: gradients, images, opacity) + computed colors + WCAG AA/AAA contrast verdict |
-| `evaluate` | Escape hatch: run agent-authored JavaScript in the page and get the JSON result, for the genuinely bespoke case no other tool covers |
+
+**Interaction & time** — states, not just snapshots.
+
+| Tool | Purpose |
+|---|---|
+| `interact` | Drive the UI into a state (open a menu/popup/modal, reveal a tab) and **leave it there** so you can inspect the new state — reports post-action visibility + box |
+| `record_interaction` | One interaction → a source-attributed causal timeline: handlers, mutations, cancelled transitions, layout shifts |
+
+**Fixing & verifying**
+
+| Tool | Purpose |
+|---|---|
 | `inject_css` | The live fix loop: trial declarations on an element (or a page-wide rule) without touching source — see what changed, converge, write source once, revert |
-| `annotated_screenshot` | Screenshot with numbered marks that equal snapshot uids — or an element-scoped crop via `clipTo` with `padding`/`scale` zoom and optional `annotate:false` |
 | `style_diff` | Record styles, compare later — verify-my-fix loops |
+| `evaluate` | Escape hatch: run agent-authored JavaScript in the page and get the JSON result, for the genuinely bespoke case no other tool covers |
+| `annotated_screenshot` | Screenshot with numbered marks that equal snapshot uids — or an element-scoped crop via `clipTo` with `padding`/`scale` zoom and optional `annotate:false` |
 
 Full reference: [docs/tools.md](docs/tools.md)
 
@@ -134,8 +165,8 @@ Visionaire never executes page-authored code as instructions; it only reads and 
 **Dual-licensed — free for people, paid for companies:**
 
 - **Noncommercial use** (individuals, personal projects, hobby/study, charities, educational and public research institutions): free under the [PolyForm Noncommercial License 1.0.0](LICENSE).
-- **Commercial use** (use by or for a business, in paid work, or in any product or service): requires a commercial license — plans from $49/year, 30-day free evaluation. See **[COMMERCIAL.md](COMMERCIAL.md)**.
+- **Commercial use** (use by or for a business, in paid work, or in any product or service): requires a commercial license. Contact [@mi60dev](https://github.com/mi60dev) (GitHub issue or profile) to obtain one.
 
-Contributions are welcome — by submitting one you accept the contributor license grant in [CONTRIBUTING.md](CONTRIBUTING.md), which lets the project owner keep dual-licensing the whole codebase (including your contribution) commercially.
+Contributions are welcome, but note that by contributing you agree your contribution is licensed to the project owner under terms compatible with this dual-licensing model.
 
 *Versions prior to v0.6.1 were published under MIT; that grant applies only to those historical versions.*
