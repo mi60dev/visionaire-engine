@@ -33,8 +33,11 @@ const inputSchema = {
   region: z
     .object({ x: z.number(), y: z.number(), width: z.number().positive(), height: z.number().positive() })
     .optional()
-    .describe('Clip to this viewport rectangle (CSS px)'),
-  fullPage: z.boolean().default(false),
+    .describe('Clip to this viewport rectangle (CSS px). Ignored when clipTo is given (clipTo wins).'),
+  fullPage: z
+    .boolean()
+    .default(false)
+    .describe('Capture the whole page height. Ignored when clipTo or region is given (they win).'),
   clipTo: z
     .object({
       uid: z.string().optional().describe('Element uid from a prior page_snapshot (e.g. "e8")'),
@@ -44,8 +47,9 @@ const inputSchema = {
     })
     .optional()
     .describe(
-      'Crop the screenshot to this element\'s border box instead of the whole viewport ' +
-        '(target by uid | selector | x+y). Pairs with padding, scale, and annotate.',
+      "Crop the screenshot to this element's border box instead of the whole viewport " +
+        '(target by uid | selector | x+y). Pairs with padding, scale, and annotate. ' +
+        'Takes precedence over region and fullPage — pick ONE capture mode.',
     ),
   padding: z
     .number()
@@ -373,9 +377,18 @@ export const annotatedScreenshotTool: ToolDef = {
   inputSchema,
   handler: async (ctx, args) => {
     const a = argsSchema.parse(args)
-    if (a.region && a.fullPage) throw new Error('region and fullPage are mutually exclusive')
+    // Capture-mode precedence instead of hard errors: an LLM combining these has an
+    // obvious intent (the most specific mode). Resolve it, do the work, and say so
+    // in the caption — one successful call beats an error round-trip.
+    const precedenceNotes: string[] = []
     if (a.clipTo && (a.region || a.fullPage)) {
-      throw new Error('clipTo is mutually exclusive with region and fullPage.')
+      const ignored = [a.region ? 'region' : '', a.fullPage ? 'fullPage' : ''].filter(Boolean).join(' and ')
+      precedenceNotes.push(`note: ${ignored} ignored — clipTo is the capture mode and takes precedence`)
+      a.region = undefined
+      a.fullPage = false
+    } else if (a.region && a.fullPage) {
+      precedenceNotes.push('note: fullPage ignored — region is more specific and takes precedence')
+      a.fullPage = false
     }
 
     const scale = clamp(a.scale, MIN_SCALE, MAX_SCALE)
@@ -436,6 +449,7 @@ export const annotatedScreenshotTool: ToolDef = {
             (scale !== 1 ? ` @${scale}x` : '') +
             (a.padding > 0 ? ` (+${a.padding}px padding)` : '') +
             (a.annotate ? '' : ' — clean crop, no marks'),
+          ...precedenceNotes,
         ]
         return { text: lines.join('\n'), images: [{ data: shot.data, mimeType: 'image/png' }] }
       }
@@ -460,6 +474,7 @@ export const annotatedScreenshotTool: ToolDef = {
         lines.push('no markable elements found — screenshot has no marks')
       }
       if (skipped.length > 0) lines.push(`skipped: ${skipped.join(', ')}`)
+      lines.push(...precedenceNotes)
 
       return { text: lines.join('\n'), images: [{ data: shot.data, mimeType: 'image/png' }] }
     } finally {

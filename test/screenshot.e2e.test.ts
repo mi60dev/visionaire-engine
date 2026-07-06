@@ -88,6 +88,22 @@ describe.skipIf(!chromePath)('annotated_screenshot e2e — real Chrome', () => {
     expect(res.text).not.toContain('marks:')
   })
 
+  it('clipTo combined with fullPage/region succeeds via precedence + teaching note (no error round-trip)', async () => {
+    // Field report: an agent passed clipTo together with fullPage and got a hard
+    // "mutually exclusive" error. Intent is obvious — resolve it, note it, move on.
+    const res = await run({ clipTo: { selector: '#promo-banner' }, fullPage: true, region: { x: 0, y: 0, width: 10, height: 10 } })
+    onlyImage(res)
+    expect(res.text).toMatch(/^element screenshot <div#promo-banner/)
+    expect(res.text).toMatch(/note: region and fullPage ignored — clipTo is the capture mode/)
+  })
+
+  it('region + fullPage resolves to region with a note', async () => {
+    const res = await run({ region: { x: 0, y: 0, width: 100, height: 100 }, fullPage: true })
+    onlyImage(res)
+    expect(res.text).toContain('region 100x100')
+    expect(res.text).toMatch(/note: fullPage ignored — region is more specific/)
+  })
+
   it('clipTo a uid works (the uid idiom, not just selectors)', async () => {
     // Resolve #promo-banner to a real uid the way page_snapshot would, then clip by it.
     const { uid } = await resolveTarget(session.context(), { selector: '#promo-banner' })
@@ -186,14 +202,6 @@ describe.skipIf(!chromePath)('annotated_screenshot e2e — real Chrome', () => {
     await expect(run({ clipTo: { selector: '.hidden-action' } })).rejects.toThrow(/no layout box/i)
   })
 
-  it('rejects clipTo combined with region or fullPage', async () => {
-    await expect(
-      run({ clipTo: { selector: '#promo-banner' }, fullPage: true }),
-    ).rejects.toThrow(/mutually exclusive/i)
-    await expect(
-      run({ clipTo: { selector: '#promo-banner' }, region: { x: 0, y: 0, width: 10, height: 10 } }),
-    ).rejects.toThrow(/mutually exclusive/i)
-  })
 
   it('rejects an unknown clipTo uid with an actionable message', async () => {
     await expect(run({ clipTo: { uid: 'e9999' } })).rejects.toThrow(/page_snapshot/)
