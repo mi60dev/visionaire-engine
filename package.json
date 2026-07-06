@@ -1,7 +1,7 @@
 {
   "name": "visionaire-engine",
   "version": "0.6.1",
-  "description": "Deterministic rendered-page → LLM context MCP server: which rule, which file, which line — and why it wins.",
+  "description": "Deterministic rendered-page \u2192 LLM context MCP server: which rule, which file, which line \u2014 and why it wins.",
   "type": "module",
   "bin": {
     "visionaire-engine": "dist/index.js"
@@ -37,5 +37,23 @@
     "tsx": "^4.22.4",
     "typescript": "^6.0.3",
     "vitest": "^3.2.6"
-  }
+  },
+  "files": [
+    "dist/",
+    "docs/",
+    "README.md",
+    "LICENSE",
+    "COMMERCIAL.md",
+    "COMMERCIAL-LICENSE-AGREEMENT.md",
+    "hero.png",
+    "hero-2.jpeg"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mi60dev/visionaire-engine.git"
+  },
+  "bugs": {
+    "url": "https://github.com/mi60dev/visionaire-engine/issues"
+  },
+  "homepage": "https://github.com/mi60dev/visionaire-engine#readme"
 }
