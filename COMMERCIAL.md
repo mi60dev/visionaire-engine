@@ -6,9 +6,14 @@ under the [PolyForm Noncommercial License 1.0.0](LICENSE).
 
 **Commercial use requires a commercial license** — in practice, any use in or for
 a for-profit business (of any size), in paid work, for client projects, or in any
-commercial product or service. This page is the storefront; the full agreement is
-published at [COMMERCIAL-LICENSE-AGREEMENT.md](COMMERCIAL-LICENSE-AGREEMENT.md)
-and is accepted by paying the invoice — no signature round-trip.
+commercial product or service.
+
+> **Commercial licensing is opening soon — not on sale yet.** The plans and terms
+> below are published in advance so you know what's coming. Until sales open,
+> businesses may use the free **30-day evaluation** and
+> [register interest](#register-interest) — registering locks in the introductory
+> pricing below. The draft terms live in
+> [COMMERCIAL-LICENSE-AGREEMENT.md](COMMERCIAL-LICENSE-AGREEMENT.md).
 
 ## Why pay for this?
 
@@ -22,7 +27,7 @@ no AI inside, works with Claude, Copilot, Cursor, and any MCP client.
 
 ## Plans
 
-| Plan | Who it's for | Price (introductory) |
+| Plan | Who it's for | Planned price (introductory) |
 |---|---|---|
 | **Freelancer** | One person doing paid/client work | **$49 / year** |
 | **Team** | Up to 10 developers in one organization | **$199 / year** |
@@ -51,15 +56,14 @@ starting on first commercial use — then buy a license or stop commercial use.
 embedding it in a product or service you sell, or offering it as part of a
 hosted/managed offering.
 
-## How to buy
+## Register interest
 
-Payment links are being set up. Until then:
+Sales are not open yet. To be first in line:
 
-1. Open a [commercial license request](https://github.com/mi60dev/visionaire-engine/issues/new?title=Commercial+license+request&labels=commercial)
-   on GitHub (or contact [@mi60dev](https://github.com/mi60dev) directly), and
-2. you'll receive an invoice/payment link referencing the
-   [license agreement](COMMERCIAL-LICENSE-AGREEMENT.md) — read it first;
-   paying the invoice is what accepts it.
+1. Open a [register-interest issue](https://github.com/mi60dev/visionaire-engine/issues/new?title=Commercial+license+—+register+interest&labels=commercial)
+   on GitHub (or contact [@mi60dev](https://github.com/mi60dev) directly).
+2. You'll be notified when purchasing opens — registrants keep the introductory
+   pricing above. In the meantime, the 30-day evaluation covers your trial use.
 
 ## FAQ
 
@@ -81,6 +85,10 @@ You stop using the software commercially (or renew). Licenses are term-based.
 **Do students / teachers / researchers / charities / government institutions pay?**
 No — you're already free under the PolyForm Noncommercial license.
 
+**Can I buy right now?**
+Not yet — licensing opens soon. Use the 30-day evaluation and register interest;
+registrants keep the introductory pricing.
+
 **Can I try before buying?**
 Yes — one 30-day commercial evaluation per organization, no registration required.
 
@@ -97,6 +105,7 @@ No. Same code, same features — the difference is purely the license.
 
 ---
 
-*Prices and terms may be revised for new customers; active subscriptions keep
-their terms. This page is a summary — the binding terms are in
+*Prices and terms may be revised before sales open and for new customers;
+registered interest keeps the introductory pricing. This page is a summary — once
+sales open, the binding terms will be
 [COMMERCIAL-LICENSE-AGREEMENT.md](COMMERCIAL-LICENSE-AGREEMENT.md).*

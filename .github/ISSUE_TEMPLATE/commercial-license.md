@@ -1,17 +1,17 @@
 ---
-name: Commercial license request
-about: Get a commercial license for business/paid use (plans in COMMERCIAL.md)
-title: "Commercial license request"
+name: Commercial license — register interest
+about: Licensing opens soon — register to be notified and keep introductory pricing
+title: "Commercial license — register interest"
 labels: commercial
 ---
 
-Thanks for supporting Visionaire! A few details and you'll receive the agreement
-and an invoice/payment link:
+Thanks for your interest in Visionaire! Commercial licensing is **opening soon**
+(see [COMMERCIAL.md](../../blob/main/COMMERCIAL.md)). Registering here locks in
+the introductory pricing for you. A few optional details help plan capacity:
 
-- **Plan** (Freelancer / Team / Business / Enterprise-OEM):
-- **Organization name** (or "sole trader/freelancer"):
-- **Country** (for the invoice):
-- **Number of developers who will use the tool**:
-- **Contact email for the invoice/agreement**:
+- **Plan you're interested in** (Freelancer / Team / Business / Enterprise-OEM):
+- **Organization** (or "freelancer"):
+- **Rough number of developers**:
 
-Anything else you'd like to ask, ask here.
+You'll be notified on this issue when purchasing opens. Meanwhile, the free
+30-day commercial evaluation covers your trial use.

@@ -2,6 +2,11 @@
 
 **Version 1.0 — [DATE]** *(DRAFT — fill bracketed fields and have counsel confirm before first sale)*
 
+> **Not yet in effect.** Commercial licenses are **not currently offered**. This
+> draft is published in advance for transparency; it binds no one until sales
+> open and an invoice referencing it is issued and paid. To be notified when
+> licensing opens, see [COMMERCIAL.md](COMMERCIAL.md#register-interest).
+
 This Commercial License Agreement (the "**Agreement**") is between **[LEGAL NAME / ENTITY, e.g. "Vision Labs EOOD"], UIC [№], [address], Bulgaria** ("**Licensor**") and the person or entity named on the corresponding invoice ("**Customer**"). It takes effect on the date Licensor receives full payment of the license fee (the "**Effective Date**"). **Customer accepts this Agreement by paying that invoice; no signature is required.**
 
 **Business customers only.** Commercial licenses are offered solely to persons acting in a business or professional capacity, not to consumers. Noncommercial use is separately available free of charge under the [PolyForm Noncommercial License 1.0.0](LICENSE).
