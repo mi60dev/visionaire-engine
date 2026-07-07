@@ -162,11 +162,6 @@ Visionaire never executes page-authored code as instructions; it only reads and 
 
 ## License
 
-**Dual-licensed — free for people, paid for companies:**
+**[Apache License 2.0](LICENSE)** — free for everyone, including commercial use, with a patent grant. Copyright © 2026 Mihail Valchev ([NOTICE](NOTICE)).
 
-- **Noncommercial use** (individuals, personal projects, hobby/study, charities, educational and public research institutions): free under the [PolyForm Noncommercial License 1.0.0](LICENSE).
-- **Commercial use** (use by or for a business, in paid work, or in any product or service): requires a commercial license. Contact [@mi60dev](https://github.com/mi60dev) (GitHub issue or profile) to obtain one.
-
-Contributions are welcome, but note that by contributing you agree your contribution is licensed to the project owner under terms compatible with this dual-licensing model.
-
-*Versions prior to v0.6.1 were published under MIT; that grant applies only to those historical versions.*
+Built and maintained by [@mi60dev](https://github.com/mi60dev). Contributions welcome under the Apache-2.0 terms. If your company relies on it and wants to support development — or wants premium add-ons or priority support — see [COMMERCIAL.md](COMMERCIAL.md).
