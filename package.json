@@ -43,9 +43,7 @@
     "docs/",
     "README.md",
     "LICENSE",
-    "NOTICE",
-    "hero.png",
-    "hero-2.jpeg"
+    "NOTICE"
   ],
   "repository": {
     "type": "git",
