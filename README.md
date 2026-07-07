@@ -39,12 +39,6 @@ AI coding agents are structurally blind to what they render. They emit CSS as te
 - **[Why AI Sucks At Front End](https://nerdy.dev/why-ai-sucks-at-front-end)** — Adam Argyle on why models can't reason about layout they can't perceive.
   > *"It's an LLM, not a rendering engine! It's notoriously bad at math, and throwing screenshots at it means very little. It's stabbing in the dark."*
 
-- **[When AI Gets Stuck in a Loop: A CSS Nightmare](https://dev.to/info_vertex/when-ai-gets-stuck-in-a-loop-a-css-nightmare-and-lessons-learned-3mn6)** — Lucas Chabrera Querol's three-day battle with a single centering bug.
-  > *"Ever had an AI model tell you 'Now I see the problem!' for three days straight?"*
-
-- **[Add browser rendering / DOM inspection to Claude Code (#52907)](https://github.com/anthropics/claude-code/issues/52907)** — the exact capability request, filed against Claude Code itself (closed as not planned).
-  > *"Claude itself remains blind to what it just produced, which breaks the feedback loop on every iteration."*
-
 - **[Is AI Causing a Repeat of Frontend's Lost Decade?](https://mastrojs.github.io/blog/2026-05-23-is-AI-causing-a-repeat-of-frontends-lost-decade/)** — Mauro Bieg on the wider cost of AI-generated frontend.
   > *"AI is enabling lots of AI slop — but this doesn't mean we don't still need people who know what they're doing."*
 
