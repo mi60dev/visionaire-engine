@@ -33,9 +33,9 @@ describe.skipIf(!chromePath)('interact e2e — real Chrome over local http', () 
   beforeAll(async () => {
     server = http.createServer((req, res) => {
       const rel = (req.url === '/' ? '/popup.html' : (req.url ?? '/')).split('?')[0]!
-      const file = path.join(fixturesDir, path.normalize(rel))
-      // Containment guard: a fixture request must resolve inside fixturesDir (path-traversal barrier).
-      if (file !== fixturesDir && !file.startsWith(fixturesDir + path.sep)) {
+      // path.join normalizes; the startsWith barrier rejects anything outside fixturesDir.
+      const file = path.join(fixturesDir, rel)
+      if (!file.startsWith(fixturesDir + path.sep)) {
         res.writeHead(403)
         res.end()
         return

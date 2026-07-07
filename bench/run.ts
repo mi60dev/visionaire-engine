@@ -107,8 +107,9 @@ const MIME: Record<string, string> = {
 async function startFixtureServer(): Promise<{ baseUrl: string; close: () => Promise<void> }> {
   const server = http.createServer((req, res) => {
     const urlPath = decodeURIComponent(new URL(req.url ?? '/', 'http://bench').pathname)
-    const filePath = path.join(here, path.normalize(urlPath))
-    if (filePath !== here && !filePath.startsWith(here + path.sep)) {
+    // path.join normalizes; the startsWith barrier rejects anything outside `here`.
+    const filePath = path.join(here, urlPath)
+    if (!filePath.startsWith(here + path.sep)) {
       res.writeHead(403)
       res.end('forbidden')
       return
