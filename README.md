@@ -2,9 +2,11 @@
 
 > **Which rule, which file, which line — and why it wins.**
 
+[![npm](https://img.shields.io/npm/v/visionaire-engine)](https://www.npmjs.com/package/visionaire-engine)
 [![CI](https://github.com/mi60dev/visionaire-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/mi60dev/visionaire-engine/actions/workflows/ci.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
-[![visionaire-engine MCP server](https://glama.ai/mcp/servers/mi60dev/visionaire-engine/badges/score.svg)](https://glama.ai/mcp/servers/mi60dev/visionaire-engine)
+
+[![visionaire-engine MCP server](https://glama.ai/mcp/servers/mi60dev/visionaire-engine/badges/card.svg)](https://glama.ai/mcp/servers/mi60dev/visionaire-engine)
 
 ![Visionaire Engine hero image](hero.png)
 
@@ -59,11 +61,18 @@ Winner, losers with the decisive loss reason, and an honest edit pointer for eac
 
 Requires Node ≥ 20 and Chrome/Chromium installed.
 
-```bash
-npm install && npm run build
+Fastest path — register straight from npm with Claude Code (no clone, no build):
 
-# register with Claude Code:
-claude mcp add visionaire -- node /absolute/path/to/visionaire-engine/dist/index.js
+```bash
+claude mcp add visionaire -- npx -y visionaire-engine
+```
+
+Or run from a clone (for development or a pinned local build):
+
+```bash
+git clone https://github.com/mi60dev/visionaire-engine && cd visionaire-engine
+npm install && npm run build
+claude mcp add visionaire -- node "$PWD/dist/index.js"
 ```
 
 Using **GitHub Copilot, Cursor, Claude Desktop, Google Antigravity**, or another client? See **[docs/clients.md](docs/clients.md)** for a copy-paste config for each, plus browser-install help for Linux/WSL/Docker.
