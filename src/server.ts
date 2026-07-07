@@ -2,7 +2,11 @@
  * MCP server assembly: three session tools owned here (connect / navigate /
  * set_viewport) plus the sixteen ToolDef tools from src/tools/. SPEC §4, §11, §14.
  */
+import { createRequire } from 'node:module'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+
+// Version from package.json at runtime — ../package.json resolves from both dist/ and src/.
+const PACKAGE_VERSION: string = (createRequire(import.meta.url)('../package.json') as { version: string }).version
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
 import { z } from 'zod'
 import type { SessionManager } from './session.js'
@@ -181,7 +185,7 @@ const SERVER_INSTRUCTIONS = [
 
 export function createServer(session: SessionManager): McpServer {
   const server = new McpServer(
-    { name: 'visionaire-engine', version: '0.1.0' },
+    { name: 'visionaire-engine', version: PACKAGE_VERSION },
     { instructions: SERVER_INSTRUCTIONS },
   )
 
