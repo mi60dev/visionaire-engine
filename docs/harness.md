@@ -39,7 +39,7 @@ and left untouched.
 
 ## Marker mechanics
 
-Two zero-byte-ish marker files under `.claude/` carry the state:
+Two zero-byte-ish marker files under `.claude/` carry the state, and the Stop gate reads them:
 
 1. **`.claude/.visionaire_pending`** — touched by the nudge hook whenever an
    `Edit`/`Write`/`MultiEdit` targets a rendering file. Meaning: "this turn

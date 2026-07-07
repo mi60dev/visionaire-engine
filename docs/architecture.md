@@ -29,7 +29,7 @@ CDP also means zero site cooperation (no build step, no plugin, no snippet) and 
 │ MCP client │◄────────►│ visionaire-engine (Node, TypeScript, no LLM inside)   │
 │ (Claude    │          │                                                       │
 │  Code,     │          │  index.ts ── stdio transport, shutdown                │
-│  Cursor…)  │          │  server.ts ─ registers 16 tools                       │
+│  Cursor…)  │          │  server.ts ─ registers 28 tools                       │
 └────────────┘          │  session.ts ─ SessionManager ── puppeteer-core ── CDP │
                         │       │            │                                  │
                         │  uid.ts (registry) │  attribution/stylesheets.ts      │
@@ -73,7 +73,7 @@ src/
                   stdout is the MCP protocol; all diagnostics go to stderr.
   server.ts       createServer(session): registers connect / navigate /
                   set_viewport inline (their zod schemas live here) plus the
-                  thirteen ToolDefs from tools/. Wraps every handler so errors
+                  twenty-five ToolDefs from tools/. Wraps every handler so errors
                   come back as isError text, never a crashed server.
   session.ts      SessionManager: find Chrome (CHROME_PATH or per-OS paths),
                   launch via puppeteer-core or attach to a running browser,
@@ -102,6 +102,20 @@ src/
     get-listeners.ts      event listeners with handler file:line
     explain-animations.ts animation census + declared rules + "not smooth" findings
     record-interaction.ts one interaction → source-attributed causal timeline
+    interact.ts           perform one action, leave the new state in place
+    measure-element.ts    rendered-pixel + text-ink geometry, centering verdict
+    evaluate.ts           escape hatch: run agent JS in the page, JSON back
+    inject-css.ts         revertable live-CSS trial — the fix loop
+    check-alignment.ts    DEPRECATED — group alignment audit; use assert_visual
+    pick-color.ts         painted-pixel sample + WCAG contrast verdict
+    assert-visual.ts      v0.7 verification gate — PASS/FAIL rendered-geometry
+                          assertions + re-runnable named suites (JSON envelope)
+    visual-diff.ts        v0.7 pixel diff vs mockup/baseline → regions → uids
+    impact-preview.ts     v0.7 blast radius + sandboxed dry-run before an edit
+    diagnose.ts           v0.7 ranked "why is this broken" culprits
+    responsive-sweep.ts   v0.7 re-run a verification across a viewport matrix
+    capture-proof.ts      v0.7 before/after evidence bundle (images as paths)
+    assertion-schema.ts   shared zod schema for assert_visual + responsive_sweep
 
   engine/         pure(ish) decision logic — the deterministic core
     cascade.ts      per-longhand winner/loser resolution (see below)

@@ -40,7 +40,7 @@ npm test          # 435 tests; the e2e part auto-skips without Chrome
 | Command | What it runs | Notes |
 |---|---|---|
 | `npm run build` | `tsc -p tsconfig.json` | Emits `dist/` with declarations + source maps. `dist/index.js` is the `bin` entry. |
-| `npm test` | `vitest run` | All 33 test files. 60 s test/hook timeouts (browser startup headroom). |
+| `npm test` | `vitest run` | All 35 test files. 60 s test/hook timeouts (browser startup headroom). |
 | `npm run dev` | `tsx src/index.ts` | The MCP server from source, on stdio. It waits for an MCP client on stdin — see [Registering with MCP clients](#registering-with-mcp-clients) before wiring it up. |
 | `npm run bench` | `tsx bench/run.ts` | The 24-case seeded-bug benchmark on real headless Chrome — see [Benchmark](#benchmark). |
 | `npm run demo` | `tsx scripts/demo.ts` | CLI loop with no MCP client needed — see below. |
@@ -467,7 +467,7 @@ Steps for a new pattern:
    ```
 
    Include at least one *ordering* test if your rule could shadow (or be
-   shadowed by) a neighbor — that is what most of the existing 32 tests guard.
+   shadowed by) a neighbor — that is what most of the existing 40 tests guard.
 
 ### Recipe 4: add a computed property to the whitelist
 
@@ -525,7 +525,7 @@ claude mcp add visionaire-dev -- npx tsx /absolute/path/to/visionaire-engine/src
 ```
 
 Do **not** register `npm run dev` as the server command: npm prints its
-`> visionaire-engine@0.1.0 dev` banner to **stdout**, which corrupts the MCP
+`> visionaire-engine@0.7.0 dev` banner to **stdout**, which corrupts the MCP
 protocol stream before the server even starts. Invoke `node dist/index.js` or
 `npx tsx src/index.ts` directly.
 
@@ -564,20 +564,29 @@ Summarized from [architecture.md](architecture.md):
 
 - **v0.1 (shipped):** the first 12 tools, Chromium launch/attach,
   WordPress convention mode (zero WP cooperation).
-- **v0.2 (shipped):** `pick_element` click-to-pick (the 13th
-  tool, via `Overlay.setInspectMode`); the deterministic seeded-bug benchmark
+- **v0.2 (shipped):** `pick_element` click-to-pick (via
+  `Overlay.setInspectMode`); the deterministic seeded-bug benchmark
   harness (`bench/`, run with `npm run bench`); minification-aware granularity
   degradation; census platform header.
-- **v0.3 (this codebase — the time dimension):** `get_listeners`,
+- **v0.3 (shipped — the time dimension):** `get_listeners`,
   `explain_animations`, `record_interaction`; the ScriptRegistry (JS file:line
   attribution through the WP origin lens); the flex `min-width:auto`
   diagnostic (flipped bench case 9 from XFAIL to PASS).
-- **v0.4:** trace-based compositor-failure reasons (Lighthouse's
-  non-composited-animations enum decode); opt-in DOM-breakpoint attribution
-  for attribute mutations; source-map hardening; `@layer` verdict edge cases;
-  `style_diff` across viewports.
-- **v1.1:** a WordPress companion plugin (~6 Abilities on the official
+- **v0.4 (shipped):** `interact` (drive the UI into a state and leave it),
+  `measure_element` (sub-pixel glyph/text-ink centering), the `evaluate` escape
+  hatch, element-scoped crops/zoom on `annotated_screenshot`, `find_elements`
+  `match:"any"` / `visibleOnly:false`, zero-config cold-start Chrome discovery.
+- **v0.5 (shipped):** `inject_css` (the live fix loop), `navigate { bypassCache }`
+  hard reloads, blast-radius + scoped-fix reporting on `explain_styles`.
+- **v0.6 (shipped):** the pixel-perfect pack — `check_alignment` and `pick_color`.
+- **v0.7 (shipped — the verification layer):** `assert_visual`, `visual_diff`,
+  `impact_preview`, `diagnose`, `responsive_sweep`, `capture_proof`; the
+  verify-after-edit harness (`npx visionaire-engine init-harness`);
+  `style_diff { capture_pixels }`; `check_alignment` deprecated in favor of
+  `assert_visual`.
+- **Still ahead:** trace-based compositor-failure reasons (Lighthouse's
+  non-composited-animations enum decode); opt-in DOM-breakpoint attribution for
+  attribute mutations; a WordPress companion plugin (~6 Abilities on the official
   mcp-adapter, WP 6.9+) for enqueue-registry lookups, Elementor control
-  resolution, and template-override detection.
-- **v1.2:** the LLM-in-the-loop half of the benchmark (does the context lift
-  model diagnosis accuracy and cut token cost); Firefox/BiDi investigation.
+  resolution, and template-override detection; the LLM-in-the-loop half of the
+  benchmark; Firefox/BiDi investigation.

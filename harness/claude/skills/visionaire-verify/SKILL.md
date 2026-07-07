@@ -20,7 +20,7 @@ Tailwind classes, template/JSX markup, inline styles). If in doubt, verify.
    - Otherwise state your claim as assertions, e.g.
      assert_visual { assertions: [{ type:"equal_height", targets:[{selector:".card"}] }] }.
 4. If the verdict is FAIL, read measured and offending_uids, then call
-   diagnose { target: <offending uid>, symptom:"auto" } and fix the named culprit.
+   diagnose { uid: <offending uid>, symptom:"auto" } and fix the named culprit.
    Repeat from step 2. Do not tell the user it is fixed until the verdict is PASS.
 5. For anything responsive, run responsive_sweep { run:{ suite_id } } across
    375 / 768 / 1280 / 1920 before claiming done.
