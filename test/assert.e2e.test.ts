@@ -326,6 +326,48 @@ describe.skipIf(!chromePath)('assert_visual e2e — real Chrome', () => {
     expect((sized.measured as { candidates_above: number }).candidates_above).toBe(0)
   })
 
+  it('not_overlapped is scroll-invariant — off-screen overlaps still FAIL with identical geometry', async () => {
+    // Regression guard: a bug report claimed not_overlapped returns a false PASS
+    // when the target is outside the viewport (below the fold / scrolled off).
+    // The candidate set comes from a full-document DOMSnapshot paint index and
+    // geometry is tested in document coords, so the verdict must not depend on
+    // scroll position. #base (doc y 640) is overlapped by #badge; #sized is not.
+    const { cdp } = session.context()
+    const call = (): Promise<Envelope> =>
+      run({
+        detail: 'full',
+        assertions: [
+          { id: 'ovl', type: 'not_overlapped', targets: [{ selector: '#base' }] },
+          { id: 'clear', type: 'not_overlapped', targets: [{ selector: '#sized' }] },
+        ],
+      })
+
+    // Baseline, in view at scroll (0,0).
+    const inView = await call()
+    expect(byId(inView, 'ovl').verdict).toBe('FAIL')
+    const inViewRect = (byId(inView, 'ovl').measured as { overlap_rect: unknown }).overlap_rect
+
+    // Scroll both elements off the top: at scrollY 800 the viewport is doc y
+    // 800–1600, so #base (640–680) and #sized (720–770) are above the fold.
+    await cdp.send('Runtime.evaluate', { expression: 'window.scrollTo(0, 800)' })
+    try {
+      const offScreen = await call()
+      const ovl = byId(offScreen, 'ovl')
+      expect(ovl.verdict).toBe('FAIL') // the alleged false PASS — must stay FAIL
+      expect((ovl.measured as { candidates_above: number }).candidates_above).toBe(1)
+      expect(ovl.explanation).toContain('#badge')
+      // Document coordinates → the overlap rect is byte-identical regardless of scroll.
+      expect((ovl.measured as { overlap_rect: unknown }).overlap_rect).toEqual(inViewRect)
+      // …and an off-screen element that is genuinely NOT overlapped must still PASS
+      // (the fix must distinguish "off-screen + clear" from "off-screen + overlapped").
+      const clear = byId(offScreen, 'clear')
+      expect(clear.verdict).toBe('PASS')
+      expect((clear.measured as { candidates_above: number }).candidates_above).toBe(0)
+    } finally {
+      await cdp.send('Runtime.evaluate', { expression: 'window.scrollTo(0, 0)' })
+    }
+  })
+
   it('visible passes for border-only boxes; size_equals sees through transforms', async () => {
     const env = await run({
       assertions: [
