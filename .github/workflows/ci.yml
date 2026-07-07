@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      # ubuntu-latest ships Google Chrome; findChromeExecutable() locates it so the
+      # e2e suite runs (not just unit tests). No sandbox on CI runners.
+      - name: Show Chrome
+        run: google-chrome --version || chromium-browser --version || echo "no system chrome — e2e will auto-skip"
+      - name: Test
+        run: npm test
+        env:
+          VISIONAIRE_NO_SANDBOX: '1'
+      - name: Benchmark
+        run: npm run bench
+        env:
+          VISIONAIRE_NO_SANDBOX: '1'

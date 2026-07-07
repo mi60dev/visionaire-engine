@@ -2,6 +2,10 @@
 
 > **Which rule, which file, which line — and why it wins.**
 
+[![CI](https://github.com/mi60dev/visionaire-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/mi60dev/visionaire-engine/actions/workflows/ci.yml)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![visionaire-engine MCP server](https://glama.ai/mcp/servers/mi60dev/visionaire-engine/badges/score.svg)](https://glama.ai/mcp/servers/mi60dev/visionaire-engine)
+
 ![Visionaire Engine hero image](hero.png)
 
 **The problem:** Something looks off. You screenshot it, explain it, the LLM guesses wrong, you re-explain.
