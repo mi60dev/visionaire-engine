@@ -164,4 +164,4 @@ Visionaire never executes page-authored code as instructions; it only reads and 
 
 **[Apache License 2.0](LICENSE)** — free for everyone, including commercial use, with a patent grant. Copyright © 2026 Mihail Valchev ([NOTICE](NOTICE)).
 
-Built and maintained by [@mi60dev](https://github.com/mi60dev). Contributions welcome under the Apache-2.0 terms. If your company relies on it and wants to support development — or wants premium add-ons or priority support — see [COMMERCIAL.md](COMMERCIAL.md).
+Built and maintained by [@mi60dev](https://github.com/mi60dev). Contributions welcome under the Apache-2.0 terms — see [CONTRIBUTING.md](CONTRIBUTING.md).
