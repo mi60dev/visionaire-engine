@@ -5,6 +5,10 @@ on:
     branches: [main]
   pull_request:
 
+# Least privilege: this workflow only reads the repo (checkout + build + test).
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
