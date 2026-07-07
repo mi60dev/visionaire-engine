@@ -173,6 +173,10 @@ Visionaire never executes page-authored code as instructions; it only reads and 
 - `@layer`: unlayered-vs-layered ordering is exact; ordering between two *different* layer chains is a deterministic proxy (CDP doesn't expose layer declaration order).
 - Some CDP fields we rely on (`specificity`, `layers`) are experimental; the engine feature-detects them and falls back (e.g. to its own specificity parser), and a contract smoke test in `test/e2e.test.ts` fails loudly if a Chrome update breaks the core protocol shape (the experimental fields are logged as present/absent).
 
+## Support
+
+Visionaire is free and open source. If it saves you time and you'd like to help keep development going, you can chip in on [Ko-fi](https://ko-fi.com/mishonyai) or [Patreon](https://www.patreon.com/cw/MishonyAI). Completely optional, and genuinely appreciated. Bug reports and field notes help just as much — see [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## License
 
 **[Apache License 2.0](LICENSE)** — free for everyone, including commercial use, with a patent grant. Copyright © 2026 Mihail Valchev ([NOTICE](NOTICE)).
