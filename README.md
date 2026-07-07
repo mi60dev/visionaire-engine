@@ -18,11 +18,12 @@
 
 **You shouldn't have to write a paragraph to explain a 2px margin bug — and now you don't.** Less explaining, more fixing: built for developers, vibe coders, and anyone shipping site design changes with an LLM in the loop.
 
-**Status: v0.6** — 22 tools, 276 tests (163 unit + 113 end-to-end on real Chrome), a 24-case seeded-bug benchmark (`npm run bench`), verified live against wordpress.org.
+**Status: v0.7** — 28 tools, 435 tests (252 unit + 183 end-to-end on real Chrome), a 24-case seeded-bug benchmark (`npm run bench`), verified live against wordpress.org.
 
 <details>
 <summary><strong>What's new, by version</strong></summary>
 
+- **v0.7 — the verification layer:** `assert_visual` (a 17-type assertion grammar — PASS/FAIL verdicts with measured pixels, offending uids, and re-runnable named suites), `visual_diff` (pixel diff vs a mockup or recorded baseline, divergent regions mapped to element uids), `impact_preview` (blast radius + sandboxed dry-run before editing a shared selector), `diagnose` (ranked "why is this broken" culprits with measured evidence), `responsive_sweep` (one call → per-viewport verdict matrix), `capture_proof` (before/after evidence bundles with a verdict delta); the verify-after-edit harness for Claude Code and Cursor (`npx visionaire-engine init-harness`); `style_diff { capture_pixels }` baselines; `check_alignment` deprecated in favor of `assert_visual`
 - **v0.6 — the pixel-perfect pack:** `check_alignment` (group alignment / gap-rhythm / grid / pixel-snap audit) and `pick_color` (actual painted-pixel sampling + WCAG contrast verdicts)
 - **v0.5:** `inject_css` — the live fix loop (trial a fix on the page, see what changed, converge, write source once); `navigate { bypassCache }` for stale-stylesheet hard reloads; blast-radius + scoped-fix reporting on `explain_styles` (change *the* button, not all buttons)
 - **v0.4 (field-report items):** `interact` to drive the UI into a state and inspect it; `measure_element` for sub-pixel glyph/text-ink centering; an `evaluate` escape hatch; element-scoped crops/zoom on `annotated_screenshot`; `match:"any"` / `visibleOnly:false` on `find_elements`; zero-config cold-start Chrome discovery
@@ -92,7 +93,7 @@ npm run demo                                              # bundled fixture
 npm run demo -- https://wordpress.org --selector "a.wp-block-button__link"
 ```
 
-## The 22 tools
+## The 28 tools
 
 **Session & grounding** — get connected and find the right element without guessing.
 
@@ -120,7 +121,7 @@ npm run demo -- https://wordpress.org --selector "a.wp-block-button__link"
 | Tool | Purpose |
 |---|---|
 | `measure_element` | Sub-pixel rendered geometry: content box + true text-ink box (glyph extents) with a centering verdict — "is this × actually centered?" |
-| `check_alignment` | Group pixel audit: which of N elements is off-alignment by how many px, gap-rhythm outliers, size consistency, N-px grid conformance, pixel-snap warnings |
+| `check_alignment` | *(deprecated → `assert_visual`)* Group pixel audit: which of N elements is off-alignment by how many px, gap-rhythm outliers, size consistency, N-px grid conformance, pixel-snap warnings |
 | `pick_color` | The actual painted pixel (composited truth: gradients, images, opacity) + computed colors + WCAG AA/AAA contrast verdict |
 
 **Interaction & time** — states, not just snapshots.
@@ -139,12 +140,66 @@ npm run demo -- https://wordpress.org --selector "a.wp-block-button__link"
 | `evaluate` | Escape hatch: run agent-authored JavaScript in the page and get the JSON result, for the genuinely bespoke case no other tool covers |
 | `annotated_screenshot` | Screenshot with numbered marks that equal snapshot uids — or an element-scoped crop via `clipTo` with `padding`/`scale` zoom and optional `annotate:false` |
 
+**Verification & proof** — new in v0.7.
+
+| Tool | Purpose |
+|---|---|
+| `assert_visual` | **The verification gate.** State rendered-geometry claims (equal heights, alignment, gaps, clipping, colors, z-order — 17 assertion types) → deterministic PASS/FAIL with measured pixels and offending uids; register named suites and re-run them after every edit |
+| `visual_diff` | Pixel-diff the live page (or one element) against a mockup PNG or a recorded baseline — MATCH/DIVERGENT with divergent regions mapped back to element uids, optional heatmap artifact |
+| `impact_preview` | Blast-radius report before editing a shared selector: who else matches, grouped with uids, plus a sandboxed dry-run predicting exactly which elements would change |
+| `diagnose` | One-shot "why does this look broken" — ranked culprits with measured evidence for clipping, overflow, off-center, invisibility, overlap, wrong size |
+| `responsive_sweep` | One verification payload across many viewports → a per-viewport verdict matrix ("fixed on desktop, still broken on mobile" caught in one call) |
+| `capture_proof` | Before/after evidence bundles: annotated screenshots + suite verdicts, with a verdict delta proving the fix flipped FAIL → PASS |
+
 Full reference: [docs/tools.md](docs/tools.md)
+
+## The verify loop (stop the CSS gaslighting)
+
+An agent edits a stylesheet, reads its own diff, and declares "now the cards are equal height" — without ever seeing a rendered pixel. Visionaire gives your agent deterministic eyes on rendered truth. The loop:
+
+1. **Preview** shared-class blast radius → `impact_preview`.
+2. **Edit** the smallest change.
+3. **Assert** your claim → `assert_visual` (or re-run a named `suite_id`). You get PASS/FAIL + the actual measured pixels + the offending element uids.
+4. **Diagnose** any FAIL → `diagnose` returns the ranked culprit with evidence.
+5. **Sweep** responsive → `responsive_sweep` returns a per-viewport verdict matrix.
+6. **Prove** it → `capture_proof` bundles before/after screenshots + verdict delta.
+
+Real output — the same suite before and after a fix:
+
+```json
+{
+ "verdict": "FAIL",
+ "summary": "1 assertion: 0 PASS, 1 FAIL — registered as suite 'cards' (re-run with just {\"suite_id\":\"cards\"})",
+ "results": [
+  { "type": "equal_height", "verdict": "FAIL", "id": "cards-equal",
+    "measured": { "values": [412, 388], "unit": "px", "delta": 24, "tolerance_px": 1 },
+    "offending_uids": ["e1", "e2"] }
+ ],
+ "truncated": false, "suite_id": "cards"
+}
+```
+
+…fix the CSS, re-run with just `{ "suite_id": "cards" }`:
+
+```json
+{
+ "verdict": "PASS",
+ "summary": "1 assertion: 1 PASS, 0 FAIL",
+ "results": [
+  { "type": "equal_height", "verdict": "PASS", "id": "cards-equal",
+    "measured": { "values": [412, 412], "unit": "px", "delta": 0, "tolerance_px": 1 } }
+ ],
+ "truncated": false, "suite_id": "cards"
+}
+```
+
+Run `npx visionaire-engine init-harness` from your project root to wire the included Claude Code hooks (or Cursor rule) so the agent physically cannot end a turn claiming "it's fixed" without a verification pass on record. How the markers, hooks, and Stop gate work: [docs/harness.md](docs/harness.md).
 
 ## Documentation
 
 - [docs/clients.md](docs/clients.md) — install in Claude, Copilot, Cursor, Antigravity, and other MCP clients
 - [docs/tools.md](docs/tools.md) — tool-by-tool reference with real examples
+- [docs/harness.md](docs/harness.md) — the verify-after-edit harness (hooks, markers, `init-harness`)
 - [docs/architecture.md](docs/architecture.md) — how the deterministic pipeline works
 - [docs/wordpress.md](docs/wordpress.md) — WordPress origin resolution guide
 - [docs/development.md](docs/development.md) — building, testing, extending

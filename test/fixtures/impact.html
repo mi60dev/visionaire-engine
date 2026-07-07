@@ -1,0 +1,49 @@
+<!doctype html>
+<!--
+  impact_preview fixture — 23 elements share .nav-item across three regions.
+
+  Load-bearing geometry (document height exactly 1000px, body margin 0):
+    header  y 0–100    → 8 <a.nav-item>  link centers ≈ y 20   → 'top'    (< 250 = 25%)
+    main    y 100–900  → box-sizing:border-box, padding-top 300px, so the 6
+                         <button.nav-item> stack from y 400; 30px tall + 6px
+                         margins → centers ≈ 415..595            → 'middle' (250–749)
+    footer  y 900–1000 → 9 <a.nav-item>  link centers ≈ y 920  → 'bottom' (>= 750 = 75%)
+
+  Cascade for the dry-run: .nav-item { padding: 8px } is the shared rule an
+  injected .nav-item { padding: 20px } beats by source order (same specificity).
+  #special.nav-item { padding: 4px !important } beats the injected rule on BOTH
+  specificity and importance, so button#special must land in unaffected_count.
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<title>impact fixture</title>
+<style>
+  body { margin: 0; font: 14px/1.2 monospace; }
+  header { height: 100px; }
+  main { height: 800px; padding-top: 300px; box-sizing: border-box; }
+  footer { height: 100px; }
+  .nav-item { padding: 8px; }
+  aside button.nav-item { display: block; width: 120px; height: 30px; margin: 0 0 6px 8px; border: 0; }
+  #special.nav-item { padding: 4px !important; }
+</style>
+</head>
+<body>
+  <header>
+    <a class="nav-item" href="#h1">H1</a><a class="nav-item" href="#h2">H2</a><a class="nav-item" href="#h3">H3</a><a class="nav-item" href="#h4">H4</a><a class="nav-item" href="#h5">H5</a><a class="nav-item" href="#h6">H6</a><a class="nav-item" href="#h7">H7</a><a class="nav-item" href="#h8">H8</a>
+  </header>
+  <main>
+    <aside>
+      <button class="nav-item">B1</button>
+      <button class="nav-item">B2</button>
+      <button class="nav-item">B3</button>
+      <button class="nav-item">B4</button>
+      <button class="nav-item">B5</button>
+      <button class="nav-item" id="special">B6</button>
+    </aside>
+  </main>
+  <footer>
+    <a class="nav-item" href="#f1">F1</a><a class="nav-item" href="#f2">F2</a><a class="nav-item" href="#f3">F3</a><a class="nav-item" href="#f4">F4</a><a class="nav-item" href="#f5">F5</a><a class="nav-item" href="#f6">F6</a><a class="nav-item" href="#f7">F7</a><a class="nav-item" href="#f8">F8</a><a class="nav-item" href="#f9">F9</a>
+  </footer>
+</body>
+</html>

@@ -32,7 +32,7 @@ CDP protocol types come from `puppeteer-core` — there is no separate
 git clone <repo> && cd visionaire-engine
 npm install
 npm run build     # tsc → dist/
-npm test          # 276 tests; the e2e part auto-skips without Chrome
+npm test          # 435 tests; the e2e part auto-skips without Chrome
 ```
 
 ## Commands
@@ -40,9 +40,9 @@ npm test          # 276 tests; the e2e part auto-skips without Chrome
 | Command | What it runs | Notes |
 |---|---|---|
 | `npm run build` | `tsc -p tsconfig.json` | Emits `dist/` with declarations + source maps. `dist/index.js` is the `bin` entry. |
-| `npm test` | `vitest run` | All 23 test files. 60 s test/hook timeouts (browser startup headroom). |
+| `npm test` | `vitest run` | All 33 test files. 60 s test/hook timeouts (browser startup headroom). |
 | `npm run dev` | `tsx src/index.ts` | The MCP server from source, on stdio. It waits for an MCP client on stdin — see [Registering with MCP clients](#registering-with-mcp-clients) before wiring it up. |
-| `npm run bench` | `tsx bench/run.ts` | The 23-case seeded-bug benchmark on real headless Chrome — see [Benchmark](#benchmark). |
+| `npm run bench` | `tsx bench/run.ts` | The 24-case seeded-bug benchmark on real headless Chrome — see [Benchmark](#benchmark). |
 | `npm run demo` | `tsx scripts/demo.ts` | CLI loop with no MCP client needed — see below. |
 
 ### The demo
@@ -103,7 +103,7 @@ client, no build step (tsx runs TypeScript directly).
 
 ## Tests
 
-Twenty-three files, 276 tests total (163 pure unit + 113 e2e):
+Thirty-five files, 435 tests total (252 pure unit + 183 e2e):
 
 | File | Tests | Browser? | What it covers |
 |---|---|---|---|
@@ -130,6 +130,18 @@ Twenty-three files, 276 tests total (163 pure unit + 113 e2e):
 | `test/screenshot.e2e.test.ts` | — | **real headless Chrome** | `annotated_screenshot` element crops: `clipTo`+`padding`, `scale` zoom, `annotate:false` clean mode. |
 | `test/find.e2e.test.ts` | — | **real headless Chrome** | `find_elements` `match:'any'` union vs `'all'`, `visibleOnly:false` surfacing hidden elements, recovery hints. |
 | `test/inject.e2e.test.ts` | 5 | **real headless Chrome** | `inject_css` live fix loop: targeted `!important` trials with computed-change reporting, page-wide rules, clean revert, mode validation.
+| `test/assert.test.ts` | 45 | no | The pure assertion grammar (`engine/assert.ts`): all 17 types over constructed evidence — tolerances, DPR snapping, arity/param errors, offending-uid capping, overall verdict. |
+| `test/assert.e2e.test.ts` | 16 | **real headless Chrome** | `assert_visual` against `fixtures/assert.html`: the full grammar battery with exact measured pixels (412 vs 388), suite register/re-run, per-assertion ERROR codes, pagination, the verification marker, role+name targeting, scrolled-page and deviceScaleFactor-2 runs, containing-block clip escapes, and the paint-empty-occluder filter. |
+| `test/pixel-diff.test.ts` | 14 | no | The pixelmatch-port diff engine (`engine/pixel-diff.ts`) + the minimal PNG encoder (`engine/png-encode.ts`): YIQ thresholds, AA dismissal, ignore regions, grid regions, layout-diff. |
+| `test/visual-diff.e2e.test.ts` | 15 | **real headless Chrome** | `visual_diff` against `fixtures/visual-diff.html`: `capture_pixels` baseline → MATCH → recolor → DIVERGENT regions attributed to the box's uid, decodable heatmap artifact, layout-diff and reference/baseline error modes, skipped dynamic masks, the verification marker, and a deviceScaleFactor-2 block (derived capture scale + emulation restore). |
+| `test/impact.test.ts` | 15 | no | Pure blast-radius grouping (`engine/impact.ts`): visual_role/region/tag keys, region bucketing rule, deterministic ordering. |
+| `test/impact.e2e.test.ts` | 8 | **real headless Chrome** | `impact_preview` against `fixtures/impact.html`: 23 `.nav-item` matches grouped across regions; the sandboxed dry-run counts 22 would-change and proves the `!important` element unaffected; injected style always removed. |
+| `test/diagnose.e2e.test.ts` | 10 | **real headless Chrome** | `diagnose` against `fixtures/diagnose.html`: clipped/overflowing/not_centered/invisible/overlapping/wrong_size culprits with exact px evidence, the `auto` battery order, the healthy no-symptom control. |
+| `test/sweep.e2e.test.ts` | 8 | **real headless Chrome** | `responsive_sweep` against `fixtures/sweep.html`: suite/assertions/diagnose payloads across viewports, FAIL cells with measured actuals, viewport restore in `finally`, payload validation. |
+| `test/proof.e2e.test.ts` | 9 | **real headless Chrome** | `capture_proof` bundles: before/after phase files on disk (paths, not base64), the FAIL→PASS `verdict_delta`, missing-phase and suiteless warnings, unresolvable mark targets degrading to a warning, path-traversal rejection. |
+| `test/harness-gate.test.ts` | 7 | no | The installed hook shell scripts run for real (bash + stdin JSON): the Stop gate blocks on pending-without-verified, the `stop_hook_active` loop guard, marker clearing, the nudge's pending-marker write and rendering-file filter, and the jq-missing fallback. |
+| `test/verify-marker.test.ts` | 2 | no | `markVerified` default-path gating: silent no-op without a `.claude` dir, writes `.claude/.visionaire_verified` when it exists. |
+| `test/harness-init.test.ts` | 9 | no | The `init-harness` installer (`src/harness-init.ts`): file installs per flag, `--force` semantics, never overwriting an existing `settings.json`, unknown-flag exit code. |
 
 
 The unit tests are pure functions over constructed data — they run in
@@ -198,7 +210,7 @@ incidental strings or full formatted lines (those are cosmetic and may be
 reworded).
 
 ```bash
-npm run bench             # all 23 cases (~5 s on real headless Chrome)
+npm run bench             # all 24 cases (~5 s on real headless Chrome)
 npx tsx bench/run.ts      # the same, without the npm script
 npx tsx bench/run.ts 11   # a single case by manifest id
 ```
@@ -211,7 +223,7 @@ server instead — the v0.3 time-dimension cases need a real origin, because
 LoAF script attribution is empty on `file://` pages. The runner
 prints a per-case table — id, status, tool-output tokens, and the tokens of
 one `page_snapshot` per case (the census an agent would realistically spend to
-find the element), reported separately — then a summary line: `N/23 pass,
+find the element), reported separately — then a summary line: `N/24 pass,
 median context tokens X`. Failed cases print their missing markers plus the
 full tool output. Exit code 1 on any FAIL, so it is CI-usable.
 
@@ -250,17 +262,27 @@ the full diagnostic phrase plus `[BINDING]`.
 ```
 src/
   index.ts          # bin entry: stdio transport, graceful shutdown
-  server.ts         # createServer(session) — registers all 16 tools; owns connect/navigate/set_viewport
+  server.ts         # createServer(session) — registers all 28 tools; owns connect/navigate/set_viewport
   session.ts        # SessionManager (launch/attach Chrome, CDP domains incl. Debugger); findChromeExecutable()
   types.ts          # every shared contract, incl. ToolDef and COMPUTED_WHITELIST
   uid.ts            # UidRegistry + resolveTarget (uid | selector | x,y → node)
-  tools/            # thirteen ToolDefs, one file each (page-snapshot, explain-styles, record-interaction, …)
+  tools/            # the ToolDefs, one file each (page-snapshot, explain-styles, assert-visual, …)
   engine/           # pure deterministic engines: cascade, specificity, inactive, visibility, stacking, box-model, ancestors, animations
   attribution/      # stylesheets registry, scripts registry, sourcemaps, wordpress resolver
   format/           # census + dossier renderers (token-budgeted plain text)
+  store/            # v0.7 persistence: artifacts dir, assertion suites, pixel baselines, proof bundles, the verification marker
+  harness-init.ts   # the `npx visionaire-engine init-harness` installer
+harness/            # verify-after-edit harness sources it installs: Claude Code skill + hooks, Cursor rule (docs/harness.md)
 scripts/demo.ts     # the CLI demo
 test/               # unit + e2e + fixtures (see above)
 ```
+
+The v0.7 verification layer adds `src/store/` (suite/baseline/bundle/marker
+persistence with path-traversal-safe ids), the pure engines
+`engine/assert.ts` / `assert-collect.ts` / `pixel-diff.ts` / `png-encode.ts` /
+`impact.ts` / `diagnose.ts`, and `harness/` — the Claude Code hooks and Cursor
+rule installed into a project by `npx visionaire-engine init-harness`
+(`src/harness-init.ts`).
 
 Full data-flow walkthrough: [architecture.md](architecture.md).
 
@@ -286,7 +308,11 @@ export interface ToolDef {
 `ToolContext` gives you `{ page, cdp, uids, sheets, scripts? }` — the puppeteer
 `Page`, a CDP session, the uid registry, the stylesheet registry, and (wired at
 connect since v0.3) the script registry for JS file:line attribution.
-`ToolResult` is `{ text, images? }`.
+`ToolResult` is `{ text, images? }`. The older tools render plain-text dossiers;
+the six v0.7 verification tools instead return a compact JSON envelope in `text`
+(`{verdict?, summary, …, truncated, next_offset?, artifacts?}`, images as file
+paths under the artifacts dir) — follow that convention for new
+verification-style tools (`src/tools/assert-visual.ts` is the reference).
 
 1. **Create `src/tools/my-tool.ts`** following the existing pattern
    (`src/tools/node-at-point.ts` is the shortest real example):

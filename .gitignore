@@ -6,3 +6,12 @@ dist/
 # internal design/development doc — not published
 SPEC.md
 launch/
+
+# visionaire runtime state (suites written by assert_visual)
+.visionaire/
+
+# never commit local secrets
+.env
+.env.*
+*.pem
+*.key

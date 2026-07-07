@@ -1,0 +1,52 @@
+<!doctype html>
+<!--
+  diagnose.html — deliberately broken layouts for test/diagnose.e2e.test.ts.
+
+  LOAD-BEARING GEOMETRY (all boxes border/padding-free unless noted, body margin 0,
+  default 800x600 viewport — total page height ~200px so everything is on-screen):
+
+  (a) #clip-wrap   width 200px, overflow:hidden (clip rect = its 200px-wide padding box);
+      #clipped     child, width 234px → exceeds the clip's RIGHT edge by exactly 34px.
+  (b) #overflow-text width 150px, white-space:nowrap, one long text run → its text rects
+      and scrollWidth both exceed the 150px box (exact px is font-dependent; the test
+      cross-checks the tool's number against in-page scrollWidth/clientWidth).
+  (c) #center-wrap content width 150px; #off-center child width 100px, margin-left 40px
+      → left gap 40px vs right gap 10px (15px right of center, 30px asymmetry).
+  (d) #invisible   display:none.
+  (e) #cover-wrap  position:relative, 400x60; #covered 120x60 at (0,0);
+      #overlay     absolute at left:20 top:10, 200x40, z-index:5
+      → overlap rect exactly 100x40 px (covered x:20..120 ∩ overlay x:20..220, y:10..50).
+  (f) #sized       stylesheet rule width:320px (content-box) → vs expected 200px = 120px delta.
+  (g) #healthy     width 100px, margin:0 auto inside 300px #healthy-wrap → equal 100px
+      gaps, visible, no overflow/clip/overlap: NOTHING trips (NO_SYMPTOM control).
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<title>diagnose fixture</title>
+<style>
+  body { margin: 0; font: 16px Arial, sans-serif; }
+  #clip-wrap { width: 200px; overflow: hidden; }
+  #clipped { width: 234px; height: 20px; background: #cfc; }
+  #overflow-text { width: 150px; white-space: nowrap; }
+  #center-wrap { width: 150px; }
+  #off-center { width: 100px; height: 20px; margin-left: 40px; background: #ccf; }
+  #invisible { display: none; }
+  #cover-wrap { position: relative; width: 400px; height: 60px; }
+  #covered { width: 120px; height: 60px; background: #ddd; }
+  #overlay { position: absolute; left: 20px; top: 10px; width: 200px; height: 40px; z-index: 5; background: rgba(200, 0, 0, 0.9); }
+  #sized { width: 320px; height: 20px; background: #fcc; }
+  #healthy-wrap { width: 300px; }
+  #healthy { width: 100px; height: 20px; margin: 0 auto; background: #eee; }
+</style>
+</head>
+<body>
+  <div id="clip-wrap"><div id="clipped"></div></div>
+  <div id="overflow-text">This is a deliberately long unbroken line of text that overflows its narrow box.</div>
+  <div id="center-wrap"><div id="off-center"></div></div>
+  <div id="invisible">hidden content</div>
+  <div id="cover-wrap"><div id="covered"></div><div id="overlay"></div></div>
+  <div id="sized"></div>
+  <div id="healthy-wrap"><div id="healthy"></div></div>
+</body>
+</html>

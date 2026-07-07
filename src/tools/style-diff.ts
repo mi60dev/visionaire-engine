@@ -16,6 +16,7 @@ import { COMPUTED_WHITELIST, estimateTokens } from '../types.js'
 import { resolveTarget } from '../uid.js'
 import { getBoxSummary } from '../engine/box-model.js'
 import { formatBounds } from '../format/dossier.js'
+import { saveBaselinePixels } from '../store/baselines.js'
 
 const DIFF_BUDGET_TOKENS = 800
 /** Ignore sub-pixel layout noise when diffing box geometry. */
@@ -34,6 +35,7 @@ const slots = new Map<string, DiffSlot>()
 interface StyleDiffArgs extends TargetSpec {
   mode: 'record' | 'compare'
   slot?: string
+  capture_pixels?: boolean
 }
 
 export const styleDiffTool: ToolDef = {
@@ -53,6 +55,13 @@ export const styleDiffTool: ToolDef = {
       .string()
       .default('default')
       .describe('Recording slot name — omit the target on compare to reuse the recorded one'),
+    capture_pixels: z
+      .boolean()
+      .default(false)
+      .describe(
+        'record only: also save a clean viewport screenshot as a pixel baseline under this slot — ' +
+          "compare later with visual_diff { reference: { baseline_slot: slot } }",
+      ),
   },
   handler: styleDiff,
 }
@@ -60,10 +69,10 @@ export const styleDiffTool: ToolDef = {
 async function styleDiff(ctx: ToolContext, args: Record<string, unknown>): Promise<ToolResult> {
   const a = args as unknown as StyleDiffArgs
   const slot = a.slot ?? 'default'
-  return a.mode === 'record' ? record(ctx, a, slot) : compare(ctx, a, slot)
+  return a.mode === 'record' ? record(ctx, a, slot, a.capture_pixels === true) : compare(ctx, a, slot)
 }
 
-async function record(ctx: ToolContext, a: TargetSpec, slot: string): Promise<ToolResult> {
+async function record(ctx: ToolContext, a: TargetSpec, slot: string, capturePixels: boolean): Promise<ToolResult> {
   const node = await resolveTarget(ctx, a)
   const values = await readWhitelisted(ctx, node)
   const box = await readBox(ctx, node)
@@ -71,11 +80,18 @@ async function record(ctx: ToolContext, a: TargetSpec, slot: string): Promise<To
   // Keep a selector so the slot survives navigation when the uid goes stale.
   const selector = a.selector ?? (entry?.attrId ? `#${entry.attrId}` : undefined)
   slots.set(slot, { selector, uid: node.uid, values, box })
+  let pixelNote = ''
+  if (capturePixels) {
+    const shot = await ctx.cdp.send('Page.captureScreenshot', { format: 'png' })
+    saveBaselinePixels(slot, Buffer.from(shot.data, 'base64'))
+    pixelNote = ` pixel baseline saved — compare with visual_diff { reference: { baseline_slot: '${slot}' } }.`
+  }
   const boxNote = box ? ' + box model' : ' (no box model — element has no layout box)'
   return {
     text:
       `recorded ${values.size} computed properties${boxNote} for ${node.uid} under slot '${slot}'. ` +
-      `Make your change, then call style_diff { mode: 'compare', slot: '${slot}' }.`,
+      `Make your change, then call style_diff { mode: 'compare', slot: '${slot}' }.` +
+      pixelNote,
   }
 }
 

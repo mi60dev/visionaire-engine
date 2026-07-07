@@ -114,8 +114,11 @@ export const checkAlignmentTool: ToolDef = {
       .slice(0, 12)
       .map((b) => `  ${b.uid} ${b.identity} ${b.w.toFixed(1)}x${b.h.toFixed(1)} @(${b.x.toFixed(1)},${b.y.toFixed(1)})`)
       .join('\n')
+    const deprecation =
+      'note: check_alignment is DEPRECATED and will be removed in a future release — use assert_visual ' +
+      '(aligned_edges / equal_height / equal_width / spacing_equals) for PASS/FAIL verdicts and re-runnable suites.'
     return {
-      text: `${lines.join('\n')}\nelements:\n${legend}${boxes.length > 12 ? `\n  … +${boxes.length - 12} more` : ''}`,
+      text: `${deprecation}\n${lines.join('\n')}\nelements:\n${legend}${boxes.length > 12 ? `\n  … +${boxes.length - 12} more` : ''}`,
     }
   },
 }

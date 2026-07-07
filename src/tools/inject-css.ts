@@ -92,6 +92,11 @@ export const injectCssTool: ToolDef = {
 
     // ── revert ──
     if (revert) {
+      // Patch ids are minted as `p<N>`; reject anything else early (belt-and-braces
+      // alongside the JSON-encoded interpolation below).
+      if (revert !== 'all' && !/^p\d+$/.test(revert)) {
+        throw new Error(`Invalid revert target "${revert}" — use 'all' or a patch id like 'p2'.`)
+      }
       const removed = (await inPage(
         ctx,
         revert === 'all'
@@ -102,14 +107,17 @@ export const injectCssTool: ToolDef = {
               document.querySelectorAll('[${PATCH_ATTR}]').forEach((el) => el.removeAttribute('${PATCH_ATTR}'));
               return n;
             })()`
-          : `(() => {
-              const t = document.getElementById('${STYLE_ID_PREFIX}${revert}');
+          : // revert is caller-controlled — JSON.stringify it into the expression so a
+            // crafted value can never break out of the string literal into executable JS.
+            `(() => {
+              const id = ${JSON.stringify(revert)};
+              const t = document.getElementById(${JSON.stringify(STYLE_ID_PREFIX)} + id);
               if (!t) return 0;
               t.remove();
-              document.querySelectorAll('[${PATCH_ATTR}~="${revert}"]').forEach((el) => {
-                const rest = (el.getAttribute('${PATCH_ATTR}') || '').split(/\\s+/).filter((x) => x && x !== '${revert}');
-                if (rest.length) el.setAttribute('${PATCH_ATTR}', rest.join(' '));
-                else el.removeAttribute('${PATCH_ATTR}');
+              document.querySelectorAll('[' + ${JSON.stringify(PATCH_ATTR)} + '~="' + CSS.escape(id) + '"]').forEach((el) => {
+                const rest = (el.getAttribute(${JSON.stringify(PATCH_ATTR)}) || '').split(/\\s+/).filter((x) => x && x !== id);
+                if (rest.length) el.setAttribute(${JSON.stringify(PATCH_ATTR)}, rest.join(' '));
+                else el.removeAttribute(${JSON.stringify(PATCH_ATTR)});
               });
               return 1;
             })()`,

@@ -1,0 +1,36 @@
+<!--
+  visual_diff e2e fixture — load-bearing geometry:
+    * body margin/padding 0, solid #ffffff background, NO text anywhere (font
+      anti-aliasing would make pixel comparisons platform-dependent).
+    * #box: position:absolute at (100,80), 120x90 px, solid #1976d2 — the only
+      painted element. Tests recolor it via inline style and expect the diff
+      regions to cover exactly this rectangle and attribute to its uid.
+    * Everything fits inside the default 1280x800 launch viewport → no
+      scrollbars, scroll offset stays (0,0), devicePixelRatio 1.
+-->
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>visual-diff fixture</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: #ffffff;
+      }
+      #box {
+        position: absolute;
+        left: 100px;
+        top: 80px;
+        width: 120px;
+        height: 90px;
+        background: #1976d2;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="box"></div>
+  </body>
+</html>

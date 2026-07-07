@@ -1,6 +1,6 @@
 # Tool reference
 
-Visionaire Engine exposes 19 MCP tools: three session tools (`connect`, `navigate`, `set_viewport`) and sixteen inspection tools — ten for the frozen moment (what the page looks like and why), three for the time dimension (`get_listeners`, `explain_animations`, `record_interaction` — what happens and why), plus three added in v0.4: `interact` (drive the UI into a state and leave it there), `measure_element` (sub-pixel glyph/text-ink centering), and `evaluate` (the escape hatch for genuinely bespoke reads). All output is plain text (plus one PNG for `annotated_screenshot`), deterministic, and token-budgeted. Concepts and vocabulary come from [architecture.md](architecture.md); this page documents the tools as implemented.
+Visionaire Engine exposes 28 MCP tools: three session tools (`connect`, `navigate`, `set_viewport`), sixteen inspection tools — ten for the frozen moment (what the page looks like and why), three for the time dimension (`get_listeners`, `explain_animations`, `record_interaction` — what happens and why), plus three added in v0.4: `interact` (drive the UI into a state and leave it there), `measure_element` (sub-pixel glyph/text-ink centering), and `evaluate` (the escape hatch for genuinely bespoke reads) — three fix-loop/pixel tools from v0.5–v0.6 (`inject_css`, `check_alignment`, `pick_color`), and six **verification tools new in v0.7**: `assert_visual`, `visual_diff`, `impact_preview`, `diagnose`, `responsive_sweep`, `capture_proof` (documented in [Verification & proof](#verification--proof-v07) below). The older tools emit plain text (plus one PNG for `annotated_screenshot`); the six v0.7 tools return a **compact JSON envelope** instead — `{verdict?, summary, …, truncated, next_offset?, artifacts?}` — and return images only as **file paths** on disk, never inline. `check_alignment` is deprecated in favor of `assert_visual` (which adds PASS/FAIL verdicts and re-runnable suites) and will be removed in a future release. All output is deterministic and token-budgeted. Concepts and vocabulary come from [architecture.md](architecture.md); this page documents the tools as implemented.
 
 ## Targeting elements
 
@@ -414,6 +414,7 @@ Record an element's computed styles and box model into a named slot, then compar
 | `uid` / `selector` / `x`+`y` | TargetSpec | required on `record`; optional on `compare` | Which element. On `compare`, omit it to reuse the recorded target |
 | `mode` | `'record' \| 'compare'` | required | `record`: store a baseline. `compare`: diff against it |
 | `slot` | string | `'default'` | Recording slot name; use distinct slots to track several elements at once |
+| `capture_pixels` | boolean | `false` | `record` only (v0.7): also save a clean viewport screenshot as a **pixel baseline** under this slot, for a later `visual_diff { reference: { baseline_slot: slot } }` comparison |
 
 Slots survive navigation: alongside the uid, `record` stores a selector (the one you targeted with, or `#id` if the element has an id) and `compare` re-resolves through it when the uid has gone stale. The baseline is *not* re-recorded on compare — repeated compares keep diffing against the original recording until you `record` again.
 
@@ -421,6 +422,12 @@ Slots survive navigation: alongside the uid, `record` stores a selector (the one
 
 ```
 recorded 55 computed properties + box model for e5 under slot 'default'. Make your change, then call style_diff { mode: 'compare', slot: 'default' }.
+```
+
+With `capture_pixels: true` the record confirmation adds the pixel-baseline pointer (real output):
+
+```
+recorded 55 computed properties + box model for e1 under slot 'box'. Make your change, then call style_diff { mode: 'compare', slot: 'box' }. pixel baseline saved — compare with visual_diff { reference: { baseline_slot: 'box' } }.
 ```
 
 ```
@@ -627,6 +634,336 @@ The JS is **trusted** — you wrote it — so unlike page-derived text elsewhere
 
 ---
 
+## Verification & proof (v0.7)
+
+The six tools below close the verify loop: state a claim about the rendered page and get a measured verdict instead of trusting a source diff. Unlike the plain-text dossier tools above, they all return a **compact JSON envelope** — `{verdict?, summary, …, truncated, next_offset?, artifacts?}` — kept under a ~15 KB byte budget (override with the `VISIONAIRE_MAX_RESPONSE_KB` env var; when a response would exceed it, the page/list is halved until it fits and `truncated: true` + `next_offset` mark what was dropped). Images are returned only as **file paths** into the artifacts directory (`$VISIONAIRE_ARTIFACTS_DIR`, default `<tmpdir>/visionaire-artifacts`), never inline. Successful `assert_visual` / `visual_diff` / `responsive_sweep` calls also write the `.claude/.visionaire_verified` marker consumed by the [verify-after-edit harness](harness.md).
+
+## assert_visual
+
+The verification gate. State verifiable rendered-geometry claims — "these cards are equal height", "the nav gaps are 16px", "nothing clips this banner" — and get a deterministic per-assertion `PASS`/`FAIL`/`ERROR` verdict with the measured pixel actuals and the offending element uids. Call it after every visual edit instead of claiming success from reading source. Pass `suite_id` alongside `assertions` to register the set as a named, re-runnable suite (persisted as JSON under `<cwd>/.visionaire/suites`, or `$VISIONAIRE_SUITE_DIR`); later call with **only** `{suite_id}` to re-run the stored suite against the current render, or hand the id to `responsive_sweep` / `capture_proof`.
+
+All measurements are in **document CSS px** (viewport rect + scroll offset), so verdicts are stable across scroll positions. Before comparing, values are snapped to the device-pixel grid (rounded at `devicePixelRatio`), then the tolerance applies — `tolerance_px` defaults to **1**, settable globally or per assertion. The overall `verdict` is `FAIL` if **any** assertion is `FAIL` or `ERROR`.
+
+| Parameter | Type | Default | Meaning |
+|---|---|---|---|
+| `assertions` | array (1–100) | — | Assertions to evaluate (see the grammar below); omit to re-run a stored `suite_id` |
+| `suite_id` | string | — | With `assertions`: register them as a named suite. Alone: re-run the stored suite |
+| `tolerance_px` | number 0–100 | `1` | Global edge/size tolerance in CSS px |
+| `detail` | `'summary' \| 'full'` | `'summary'` | `full` adds per-assertion prose explanations; `summary` drops them (the measured numbers stay — they ARE the verdict). ERROR results keep their explanation either way |
+| `stop_on_first_fail` | boolean | `false` | Stop evaluating after the first FAIL/ERROR (skipped assertions force overall FAIL) |
+| `page` | `{offset, limit ≤ 200}` | `{0, 50}` | Paginate the results array of a large suite |
+
+Each assertion is `{ id?, type, targets, params?, tolerance_px? }`. **Targets** are an array of: a uid string (`"e8"`), `{ selector }` — which expands to **all** matches — or `{ role, name? }` (ARIA role + exact accessible name). The full grammar (17 types):
+
+| Type | Targets | Params | PASS when |
+|---|---|---|---|
+| `equal_height` | 2+ | — | content-box heights spread ≤ tolerance |
+| `equal_width` | 2+ | — | content-box widths spread ≤ tolerance |
+| `aligned_edges` | 2+ | `edge: 'left'\|'right'\|'top'\|'bottom'` (required) | that border-box edge coordinate's spread ≤ tolerance |
+| `centered` | 1 | `in: 'parent'\|'viewport'` (default `parent`), `axis: 'x'\|'y'\|'both'` (default `both`) | opposing gaps to the container differ ≤ tolerance on each checked axis |
+| `gap_equals` | 2+ | `axis: 'x'\|'y'` (required), `value` px (required) | every adjacent gap along the axis is within tolerance of `value` |
+| `spacing_equals` | 3+ | `axis: 'x'\|'y'` (required) | adjacent gaps are mutually equal (spread ≤ tolerance) |
+| `visible` | 1 | — | not `display:none` / `visibility:hidden` / `opacity:0`, has a non-zero-area box intersecting the viewport |
+| `not_clipped` | 1 | — | content box does not exceed any clipping ancestor (`overflow` ≠ visible) by > tolerance on any side |
+| `not_overlapped` | 1 | — | no non-ancestor/descendant element painted **above** it overlaps by > tolerance on both axes |
+| `within_viewport` | 1 | `fully` (default `true`) | fully: no side extends past the viewport by > tolerance; `fully:false`: any intersection at all |
+| `color_equals` | 1 | `property: 'text'\|'background'\|'border'` (default `text`), `value` CSS color (required), `deltaE` (default 2) | measured color within ΔE(OKLab×100) of expected. `background` uses the painted composited pixel sample when available |
+| `color_near` | 1 | same as `color_equals` | same, with a looser default `deltaE` of 5 |
+| `z_above` | exactly 2 `[A, B]` | — | A's paint order is above B's |
+| `text_not_truncated` | 1 | — | `scrollWidth − clientWidth` ≤ tolerance (notes `text-overflow: ellipsis` when set) |
+| `text_not_overflowing` | 1 | — | the union of the element's text-glyph rects stays inside its content box (± tolerance) |
+| `size_equals` | 1 | `width_px` and/or `height_px` (at least one required) | content-box size within tolerance of the expected dimensions |
+| `positioned` | exactly 2 `[A, B]` | `relation: 'left_of'\|'right_of'\|'above'\|'below'\|'inside'\|'contains'` (required) | the spatial relation holds between the two border boxes (± tolerance) |
+
+Target problems are reported as **per-assertion `ERROR` verdicts, not tool errors** — the rest of the battery still runs. Error codes: `TARGET_NOT_FOUND` (a target resolved no element, or fewer than the type's minimum), `TARGET_AMBIGUOUS` (a single-target type resolved more than its maximum, or a selector/role expanded past the 40-element cap — a truncated element set could flip a verdict, so the tool refuses instead of silently measuring a subset), `UNKNOWN_ASSERTION_TYPE`, `INVALID_PARAMS`, `MEASUREMENT_FAILED`. A dead browser session is a tool error (re-`connect`), never a per-assertion code.
+
+**Output** — the JSON envelope. Real captured battery (assert fixture, `detail: 'full'`, trimmed to three of four results):
+
+```json
+{
+ "verdict": "FAIL",
+ "summary": "4 assertions: 2 PASS, 2 FAIL",
+ "results": [
+  {
+   "type": "equal_height",
+   "verdict": "FAIL",
+   "id": "eq-h",
+   "measured": { "values": [412, 388], "unit": "px", "delta": 24, "tolerance_px": 1 },
+   "offending_uids": ["e1", "e2"],
+   "explanation": "e1 content-box height 412px vs e2 388px; delta 24px exceeds 1px tolerance"
+  },
+  {
+   "type": "gap_equals",
+   "verdict": "PASS",
+   "id": "gap",
+   "measured": { "axis": "x", "gaps": [16, 16, 16], "expected": 16, "tolerance_px": 1 }
+  },
+  {
+   "type": "not_clipped",
+   "verdict": "FAIL",
+   "id": "clip",
+   "measured": { "ancestor_uid": "e8", "ancestor_overflow": "hidden", "exceed": { "left": 0, "right": 34, "top": 0, "bottom": 0 }, "tolerance_px": 1 },
+   "offending_uids": ["e7", "e8"],
+   "explanation": "e7 is clipped by ancestor e8 <div#clip-wrap> (overflow:hidden) — content exceeds it by 34px on the right"
+  }
+  […1 more result elided]
+ ],
+ "truncated": false
+}
+```
+
+Registering a suite appends to the summary: `— registered as suite 'cards' (re-run with just {"suite_id":"cards"})`. Re-running the stored suite after the fix (real output):
+
+```json
+{
+ "verdict": "PASS",
+ "summary": "1 assertion: 1 PASS, 0 FAIL",
+ "results": [
+  {
+   "type": "equal_height",
+   "verdict": "PASS",
+   "id": "cards-equal",
+   "measured": { "values": [412, 412], "unit": "px", "delta": 0, "tolerance_px": 1 }
+  }
+ ],
+ "truncated": false,
+ "suite_id": "cards"
+}
+```
+
+Real ERROR verdicts (bad targets and a typo'd type in one battery):
+
+```json
+{
+ "verdict": "FAIL",
+ "summary": "3 assertions: 0 PASS, 0 FAIL, 3 ERROR",
+ "results": [
+  { "type": "visible", "verdict": "ERROR", "error": "TARGET_NOT_FOUND",
+    "explanation": "selector \".does-not-exist\" matches 0 elements (resolved_count: 0)", "id": "ghost" },
+  { "type": "size_equals", "verdict": "ERROR", "error": "TARGET_AMBIGUOUS",
+    "explanation": "size_equals takes exactly 1 element(s); targets resolved to 2 — narrow the selector", "id": "many" },
+  { "type": "equal_heigth", "verdict": "ERROR", "error": "UNKNOWN_ASSERTION_TYPE",
+    "explanation": "unknown assertion type \"equal_heigth\" — known: equal_height, equal_width, aligned_edges, centered, gap_equals, spacing_equals, visible, not_clipped, not_overlapped, within_viewport, color_equals, color_near, z_above, text_not_truncated, text_not_overflowing, size_equals, positioned", "id": "typo" }
+ ],
+ "truncated": false
+}
+```
+
+Re-running an unregistered suite is a tool error, quoted verbatim: `SUITE_NOT_FOUND: no suite named "no-such-suite". Known suites: cards. Register one by calling assert_visual with both assertions and suite_id.` Budget: `offending_uids` are capped at 20 per assertion (`offending_uids_truncated: true` marks the cut); results paginate via `page` and the whole envelope shrinks its page until it fits the ~15 KB backstop, signalled by `truncated: true` + `next_offset`.
+
+## visual_diff
+
+Pixel-level "does it still look right?": captures the current viewport (or one element as a clean border-box crop) and diffs it against a reference PNG — a mockup file (`reference.image_path`) or a pixel baseline recorded earlier with `style_diff { mode: 'record', capture_pixels: true }` (`reference.baseline_slot`). The diff is a pure pixelmatch-style engine (YIQ perceptual distance, anti-aliasing dismissal); divergent grid regions are mapped back to **likely element uids** via the DOMSnapshot paint index, so you learn *which element* changed, not just that pixels did. For geometry claims (heights, alignment, spacing) prefer `assert_visual` — it is OS-stable integer math, while pixel diffing is inherently environment-sensitive (fonts, GPU rasterization).
+
+The diff runs in image (device) pixels; region bboxes come back in **document CSS px**, ready for `inspect_element`. `ignore_regions` are CSS px relative to the captured area's top-left. A capture and reference of different dimensions is a `layout-diff`: verdict `DIVERGENT` at 100% with a summary telling you to re-record at the current size.
+
+| Parameter | Type | Default | Meaning |
+|---|---|---|---|
+| `target` | `'page'` \| `{uid \| selector}` | `'page'` | What to capture: the viewport, or one element's clean border-box crop |
+| `reference` | `{image_path}` \| `{baseline_slot}` | required (exactly one) | The PNG to compare against |
+| `threshold` | number 0–1 | `0.1` | Per-pixel YIQ color-distance threshold (pixelmatch semantics; smaller = stricter) |
+| `accept_pct` | number 0–100 | `0.1` | Verdict line: `MATCH` when `divergence_pct` ≤ this |
+| `ignore_antialiasing` | boolean | `true` | Dismiss pixels that look like font/edge anti-aliasing |
+| `ignore_regions` | `{x,y,width,height}[]` | `[]` | Rectangles to exclude, CSS px relative to the captured area |
+| `mask_dynamic` | (uid \| `{selector}`)[] | `[]` | Elements whose current border boxes are excluded — timestamps, ads, carousels |
+| `emit_heatmap` | boolean | `false` | Write a diff heatmap PNG (dimmed capture, differing pixels in red) and return its path in `artifacts` |
+| `region_grid` | integer 1–16 | `8` | Report divergence per NxN grid over the capture |
+
+**Output** — the JSON envelope: verdict, divergence stats, and up to 20 grid regions above a 0.5% noise floor, each with ≤ 3 likely uids. Real captured DIVERGENT run (the fixture box recolored after recording a baseline, trimmed to two of four regions):
+
+```json
+{
+ "verdict": "DIVERGENT",
+ "summary": "DIVERGENT — divergence 1.0547% (10800 of 1024000 compared px, accept_pct 0.1) for viewport vs baseline 'box'; 4 region(s) above the 0.5% noise floor; worst r1c0 @ 26.25%",
+ "reason": "pixel-diff",
+ "divergence_pct": 1.0547,
+ "diff_pixels": 10800,
+ "total_pixels": 1024000,
+ "accept_pct": 0.1,
+ "regions": [
+  { "grid": "r1c0", "bbox": { "x": 100, "y": 100, "width": 60, "height": 70 },
+    "divergence_pct": 26.25, "likely_uids": ["e1"] },
+  { "grid": "r1c1", "bbox": { "x": 160, "y": 100, "width": 60, "height": 70 },
+    "divergence_pct": 26.25, "likely_uids": ["e1"] }
+  […2 more regions elided]
+ ],
+ "truncated": false,
+ "artifacts": [
+  { "kind": "diff-heatmap", "path": "/var/folders/…/visionaire-docs-1GhGPl/artifacts/diff_0001.png" }
+ ]
+}
+```
+
+A clean comparison reads `"verdict": "MATCH", "summary": "MATCH — divergence 0% (0 of 1024000 compared px, accept_pct 0.1) for viewport vs baseline 'box'"` with `"regions": []`. Errors, quoted verbatim: an empty slot throws `BASELINE_SLOT_EMPTY: no pixel baseline recorded under slot 'nothing' — record one with style_diff { mode: 'record', capture_pixels: true, slot: 'nothing' } before comparing`; a missing file throws `REFERENCE_NOT_FOUND: no readable file at "…" — check the path, or record a baseline with style_diff { mode: 'record', capture_pixels: true } and compare via reference.baseline_slot`; captures beyond 32 M pixels throw `CAPTURE_TOO_LARGE` with a `set_viewport` hint. Budget: the regions list is halved until the envelope fits ~15 KB (`truncated: true` marks dropped regions).
+
+## impact_preview
+
+Blast-radius report to run **before** editing a shared CSS selector. Answers two questions deterministically: who else matches this selector on the current page (true match count, uids, identities, grouped by visual role / screen region / tag), and — with `proposed_change` — what would *actually* change if the declarations landed, via a sandboxed dry-run: a temporary `<style data-visionaire-impact>` is injected, computed values are diffed before/after a forced recompute, and the style is always removed. Elements protected by more specific or `!important` rules land in `unaffected_count`. Scope honesty is part of the output: everything is the current page at the current viewport — other routes/viewports/states are invisible to a live-page tool.
+
+| Parameter | Type | Default | Meaning |
+|---|---|---|---|
+| `selector` | string | required | The shared selector you are about to edit — all current matches are counted and grouped |
+| `group_by` | `'visual_role' \| 'region' \| 'tag'` | `'visual_role'` | `visual_role` = tag + up-to-2 classes + screen region + ARIA role; `region` = top/middle/bottom of the document; `tag` = element tag name |
+| `proposed_change` | `{declarations: {prop: value}}` | — | Dry-run these declarations (max 20) against the live render |
+| `detail` | `'summary' \| 'full'` | `'summary'` | `full` additionally saves an annotated screenshot of the first matches to the artifacts dir |
+| `page` | `{offset, limit ≤ 100}` | `{0, 20}` | Paginates `dry_run.changed` when a dry-run ran, otherwise the groups list |
+
+**Output** — the JSON envelope. Real captured dry-run (`.nav-item` shared by 23 elements across a header, sidebar, and footer; groups trimmed to one of three):
+
+```json
+{
+ "summary": "'.nav-item' matches 23 elements across 3 visual roles, 3 screen regions. impact is computed for the currently open page at the current viewport only — other routes/viewports/states are not visible here (use responsive_sweep for other viewports)",
+ "match_count": 23,
+ "groups": [
+  {
+   "key": "a.nav-item@bottom[role=link]",
+   "count": 9,
+   "uids": ["e15", "e16", "e17", "e18", "e19", "e20", "e21", "e22", "e23"],
+   "region": "bottom",
+   "sample_identity": "<a.nav-item>"
+  }
+  […2 more groups elided]
+ ],
+ "truncated": true,
+ "dry_run": {
+  "would_change_count": 22,
+  "unaffected_count": 1,
+  "changed": [
+   { "uid": "e1", "prop": "padding", "before": "8px", "after": "20px" },
+   { "uid": "e2", "prop": "padding", "before": "8px", "after": "20px" }
+   […4 more rows elided]
+  ],
+  "method": "sandboxed inject_css + recompute"
+ },
+ "next_offset": 6
+}
+```
+
+The one unaffected element here has `padding: 4px !important` — the dry-run proves the proposed rule cannot beat it. A declaration that changes nothing gets a verbatim note: `DRY_RUN_UNSUPPORTED_DECLARATION: 'prop: value' changed the computed value of 0 matched elements — a more specific or !important rule may beat the injected rule, a media query may gate it, or every element already computes to that value`. A selector matching nothing returns `match_count: 0` with a spelling/navigation hint instead of an error. Budget: per-element facts and the dry-run cover the first 40 matches (`match_count` stays exact, with a note when capped); ≤ 20 changed rows per page, ≤ 50 uids per group (`uids_truncated: true` marks squeezed groups); the page is halved, then per-group uid lists squeezed, until the envelope fits ~15 KB.
+
+## diagnose
+
+One-shot "why does this element look broken": runs a deterministic symptom battery against one element and returns **ranked culprits** with measured pixel evidence — no AI, every culprit is a measured fact. The tool to call when `assert_visual` returns FAIL and you need the cause, or when the user says "it looks broken" without saying why. Fix the named culprit, then re-run `assert_visual`.
+
+| Parameter | Type | Default | Meaning |
+|---|---|---|---|
+| `uid` / `selector` / `x`+`y` | TargetSpec | required (one) | Which element |
+| `symptom` | see taxonomy below | `'auto'` | What looks broken; `auto` runs the ordered battery |
+| `expected` | `{width_px?, height_px?, centered_in?}` | — | What the element SHOULD look like — required for `wrong_size` |
+| `max_culprits` | integer 1–10 | `5` | Cap on ranked culprits returned |
+
+The symptom taxonomy (all coordinates document CSS px):
+
+| Symptom | What it checks | Culprit `cause` emitted |
+|---|---|---|
+| `invisible` | the visibility decision tree (display, visibility, opacity, zero-size, off-viewport, clipped, occluded) | `invisible_<status>` |
+| `clipped` | each clipping ancestor's rect vs the element's content box, per side | `ancestor_overflow_clip` |
+| `overflowing` | `scrollWidth/Height` vs `clientWidth/Height`, and text-node glyph rects vs the content box (redundant scroll overflow folds into the text culprit) | `content_overflow`, `text_overflow` |
+| `overlapping` | paint-order candidates above the element intersected with its border box (top 3) | `overlapped_by_sibling` |
+| `not_centered` | left/right + top/bottom gap asymmetry inside the parent content box (or viewport); an axis where the element overflows the container is skipped — that is an overflow problem | `off_center` |
+| `wrong_size` | content box vs `expected` px; names the constraining property's cascade winner (selector + value + `!important`) | `size_driven_by_declaration` |
+| `auto` | the ordered battery invisible → clipped → overflowing → overlapping → not_centered (+ wrong_size only when `expected` dimensions were given); the first tripped check becomes `symptom_detected`, other tripped checks still appear as lower-ranked culprits | — |
+
+Scoring is fixed and documented (determinism is the contract): magnitudes ≤ 0.5px do not trip; confidence is `high` above 4px (boolean causes like `display:none` always rank first), `medium` in (1, 4], `low` in (0.5, 1]; ordering is detected-symptom first, then confidence, then magnitude.
+
+**Output** — the JSON envelope, capped at ~6 KB (lowest-ranked culprits are dropped with `truncated: true`). Real captured run (a 234px child inside a 200px `overflow:hidden` wrapper):
+
+```json
+{
+ "summary": "clipped: e1 <div#clipped> sticks out of clipping ancestor e2 <div#clip-wrap> (overflow:hidden) by 34px right",
+ "symptom_detected": "clipped",
+ "culprits": [
+  {
+   "rank": 1,
+   "confidence": "high",
+   "cause": "ancestor_overflow_clip",
+   "plain": "e1 <div#clipped> sticks out of clipping ancestor e2 <div#clip-wrap> (overflow:hidden) by 34px right",
+   "evidence": { "ancestor_uid": "e2", "ancestor_identity": "<div#clip-wrap>", "overflow": "hidden", "exceed_right": 34 }
+  }
+ ],
+ "truncated": false
+}
+```
+
+A healthy element is an answer too (real output): `"summary": "e3 <div#healthy> renders as expected within tolerances (5 checks run: invisible, clipped, overflowing, overlapping, not_centered)", "symptom_detected": "none", "culprits": []`. `wrong_size` without `expected` dimensions errors with `symptom "wrong_size" needs expected.width_px and/or expected.height_px — pass an expected size`.
+
+## responsive_sweep
+
+One verification payload, many viewports — the cure for "fixed on desktop, still broken on mobile". Runs a stored suite, inline assertions, or a `diagnose` probe at each viewport and returns a per-viewport matrix: PASS cells collapse to a verdict, FAIL cells carry the failed assertions with measured actuals and offending uids (never prose explanations), diagnose cells carry the detected symptom and top culprit. After every viewport change the page is settled deterministically (`document.fonts.ready` + double `requestAnimationFrame`) before measuring, and suites re-load per viewport so stored selectors re-resolve against each layout. The original viewport is restored in a `finally` (unless `restore_viewport: false`, or attach mode where puppeteer reports no viewport to restore — the summary says so).
+
+| Parameter | Type | Default | Meaning |
+|---|---|---|---|
+| `viewports` | `{width, height, deviceScaleFactor?}[]` | 375x812, 768x1024, 1280x800, 1920x1080 | Viewports to sweep, max 8 per call |
+| `run` | `{suite_id}` \| `{assertions}` \| `{diagnose}` | required (exactly one) | The payload to execute at every viewport |
+| `restore_viewport` | boolean | `true` | Restore the pre-sweep viewport when done |
+
+**Output** — the JSON envelope. Real captured sweep (an `equal_height` suite over a flex row that becomes a column under 800px; the 768 cell is trimmed):
+
+```json
+{
+ "summary": "Suite 'cards-suite': PASS at 1280x800; FAIL at 375x812 (equal_height); FAIL at 768x1024 (equal_height)",
+ "matrix": [
+  {
+   "viewport": "375x812",
+   "verdict": "FAIL",
+   "failed": [
+    {
+     "type": "equal_height",
+     "id": "cards-equal",
+     "measured": { "values": [40, 20], "unit": "px", "delta": 20, "tolerance_px": 1 },
+     "offending_uids": ["e1", "e2"]
+    }
+   ]
+  },
+  […768x1024 FAIL cell elided]
+  {
+   "viewport": "1280x800",
+   "verdict": "PASS"
+  }
+ ],
+ "truncated": false
+}
+```
+
+A viewport where the payload cannot run at all becomes an `ERROR` cell with a sanitized message — one broken viewport never aborts the sweep. Errors, quoted verbatim: more than 8 viewports throws `too many viewports (N) — max 8 per call; split the sweep into multiple calls with fewer viewports each`; zero or several payloads throws `run must carry exactly one payload: {suite_id} to re-run a stored suite, {assertions} for inline checks, or {diagnose} to probe one element per viewport`; an unknown suite fails fast with the same `SUITE_NOT_FOUND` message as `assert_visual`, before any viewport churn. Budget: FAIL cells' `failed` lists are halved until the envelope fits ~15 KB (`truncated: true`).
+
+## capture_proof
+
+Durable before/after evidence for one fix. Phase `before` records the broken state — an annotated screenshot plus, with `suite_id`, the suite's verdicts — into a named bundle under the artifacts dir (`<artifacts>/bundles/<bundle_id>/`); phase `after` re-captures and reports the **verdict delta** against the stored before-verdicts: "suite now PASS (was FAIL)" with the exact assertions that flipped. Use it to close the loop with humans: here is the before, the after, and the measured verdicts. Screenshots are written to disk and returned as file paths, never base64.
+
+| Parameter | Type | Default | Meaning |
+|---|---|---|---|
+| `phase` | `'before' \| 'after'` | required | Which side of the fix this capture is |
+| `bundle_id` | string | required | Bundle name (1–64 chars: letters, digits, hyphens, underscores) — use the SAME id for before and after |
+| `targets` | (uid \| `{selector}`)[] | `[]` | Elements to mark in the screenshot (deduped, max 25 after selector expansion); empty = auto-mark the top visible interactive/landmark elements |
+| `suite_id` | string | — | Run this stored suite and store its verdicts with the phase (enables `verdict_delta` on after) |
+| `note` | string ≤ 500 | — | Free-form caption, echoed in the summary |
+
+**Output** — the JSON envelope. Real captured after-phase (the before phase had recorded the suite FAILing, then the fix landed):
+
+```json
+{
+ "summary": "Bundle 'card-fix' AFTER captured; suite now PASS (was FAIL) — after flex-basis fix",
+ "bundle_id": "card-fix",
+ "phase": "after",
+ "artifacts": [
+  { "kind": "annotated_screenshot", "path": "/var/folders/…/artifacts/bundles/card-fix/after.png" }
+ ],
+ "truncated": false,
+ "verdict_delta": {
+  "before": "FAIL",
+  "after": "PASS",
+  "changed_assertions": [
+   { "id": "cards-equal", "before": "FAIL", "after": "PASS" }
+  ]
+ }
+}
+```
+
+The corresponding before-phase summary read `Bundle 'card-fix' BEFORE captured; suite FAIL — cards ragged before the flex fix`. An after-phase without a stored before warns (verbatim) `BUNDLE_PHASE_MISSING: no before phase captured — delta unavailable`; a before captured without `suite_id` warns `before phase has no stored verdicts (captured without suite_id) — delta unavailable`. Bundle ids failing the allow-list error with `Invalid bundle_id "…" — use 1-64 characters: letters, digits, hyphens, underscores (must start alphanumeric).` before the page is touched.
+
+---
+
 ## Recommended debugging flow
 
 1. **`connect`** — `{ url: "https://site.com" }` to launch, or `{ browserUrl: "http://127.0.0.1:9222" }` to attach to the user's real logged-in Chrome. Add `set_viewport` first thing if the bug is viewport-specific.
@@ -635,6 +972,6 @@ The JS is **trusted** — you wrote it — so unlike page-derived text elsewhere
 4. **Why: `explain_styles`** — usually with `property:` once you know what is wrong (`{ uid: "e5", property: "margin-bottom" }`). The WINNER's `→ file:line [granularity | origin — edit hint]` is the edit target; check the notes for INACTIVE declarations and `@media`/`@layer` context before editing.
 5. **When the bug only happens on interaction** — "clicking does nothing" starts at **`get_listeners`** (who owns this event, or the honest "nobody does"); "it doesn't animate right" starts at **`explain_animations`** (`property:` set to what you expected to move); and when the static answers don't explain it, **`record_interaction`** on the trigger element captures the causal timeline of the interaction itself. When the bug lives in a state you have to *open* first — a menu, popup, modal, or revealed tab — **`interact`** drives the UI there and leaves it open so steps 3–4 can inspect the new state.
 6. **When the issue is visual alignment, not a rule** — a glyph or icon that "looks off-center" even though the box model is symmetric goes to **`measure_element`**, which reports the sub-pixel text-ink-vs-content-box offset that box tools can't see. And for the genuinely bespoke read that no tool covers, **`evaluate`** runs your own JavaScript in the page.
-7. **Verify: `style_diff`** — `{ uid: "e5", mode: "record" }`, apply the fix, `navigate` to reload (uids go stale, but the slot re-resolves by selector), then `{ mode: "compare" }`. The diff should contain exactly the properties you meant to change — nothing missing, nothing extra. For a behavioral fix, re-run `record_interaction` instead and compare timelines.
+7. **Verify: `style_diff`** — `{ uid: "e5", mode: "record" }`, apply the fix, `navigate` to reload (uids go stale, but the slot re-resolves by selector), then `{ mode: "compare" }`. The diff should contain exactly the properties you meant to change — nothing missing, nothing extra. For a behavioral fix, re-run `record_interaction` instead and compare timelines. For rendered-geometry claims ("now they're equal height"), state them as **`assert_visual`** assertions and get a measured PASS/FAIL — see [Verification & proof](#verification--proof-v07).
 
 Related reading: [architecture.md](architecture.md) (how the deterministic pipeline works), [wordpress.md](wordpress.md) (origin resolution details).

@@ -12,8 +12,14 @@ import { z } from 'zod'
 import type { SessionManager } from './session.js'
 import type { ToolDef, ToolResult } from './types.js'
 import { annotatedScreenshotTool } from './tools/annotated-screenshot.js'
+import { assertVisualTool } from './tools/assert-visual.js'
+import { captureProofTool } from './tools/capture-proof.js'
 import { checkAlignmentTool } from './tools/check-alignment.js'
+import { diagnoseTool } from './tools/diagnose.js'
 import { evaluateTool } from './tools/evaluate.js'
+import { impactPreviewTool } from './tools/impact-preview.js'
+import { responsiveSweepTool } from './tools/responsive-sweep.js'
+import { visualDiffTool } from './tools/visual-diff.js'
 import { pickColorTool } from './tools/pick-color.js'
 import { explainAnimationsTool } from './tools/explain-animations.js'
 import { explainStylesTool } from './tools/explain-styles.js'
@@ -54,8 +60,20 @@ const DESCRIPTIONS: Record<string, string> = {
     "Screenshot in two modes: an overview with numbered marks burned in, where mark N equals uid eN (mark 17 = e17); or an element-scoped crop via clipTo (uid|selector|x,y) with optional padding, scale (0.5..4 zoom for tiny elements), and annotate:false for a clean unlabeled crop. Use when text tools are not enough and you need to SEE the page while keeping pixels tied to elements — spatial or visual-layout questions ('things overlap', 'the layout looks off'), to zoom in on one small element, or to confirm which element is which. Then target elements by their uid.",
   style_diff:
     "BEFORE/AFTER comparison for one element: record its styles into a named slot, change something, compare — only the properties that changed are reported. Reach for it whenever you ask 'did my fix actually change anything?' or need to prove what an edit / inject_css patch / viewport change / interaction altered. The loop: style_diff{mode:'record'} → apply the change → style_diff{mode:'compare'}. Confirms a fix moved exactly the property you intended, and nothing else.",
+  assert_visual:
+    "THE verification gate — call it after EVERY visual edit instead of claiming success from reading code. State verifiable rendered-geometry claims (equal_height, equal_width, aligned_edges, centered, gap_equals, spacing_equals, visible, not_clipped, not_overlapped, within_viewport, color_equals, color_near, z_above, text_not_truncated, text_not_overflowing, size_equals, positioned) and get a deterministic per-assertion PASS/FAIL with the measured pixels and the offending uids — 'FAIL: e87 412px vs e91 388px' ends the argument. Pass suite_id to register the set as a named regression suite; later call with ONLY {suite_id} to re-run it against the current render, or hand it to responsive_sweep for a per-viewport matrix. Never claim a visual fix works without a PASS from this tool.",
+  visual_diff:
+    "Deterministic screenshot diff of the CURRENT render (page or one element) against a reference image — a user-supplied mockup (reference: { image_path }) or a named pixel baseline recorded earlier with style_diff { capture_pixels: true } (reference: { baseline_slot }). Returns MATCH/DIVERGENT with divergence_pct, the worst NxN grid regions mapped back to likely element uids, and an optional diff-heatmap PNG written to disk as a file path (never inline). Reach for it on 'make it match the mockup' or to catch any unintended pixel change after an edit; tune threshold / ignore_antialiasing / mask_dynamic for environment noise. For geometry claims (heights, alignment, spacing) prefer assert_visual — it is OS-stable integer math; pixel diffing is inherently environment-sensitive.",
+  impact_preview:
+    "Blast-radius report to run BEFORE editing a shared selector: every element '.nav-item' currently matches on the open page — true match count, uids, identities, screen regions, grouped by visual role — so you see that the footer shares the class before you warp it. Pass proposed_change: { declarations: {'padding':'20px'} } for a sandboxed dry-run that predicts exactly which matched elements' computed values would change and which are protected by more specific rules. Scope honesty: current page, current viewport only (other routes/viewports/interactive states are invisible here — use responsive_sweep for viewports). Use it whenever a fix edits a class used in more than one place.",
+  diagnose:
+    "One-shot 'why is this broken': give it an element (uid/selector/x,y) and an optional symptom — clipped, overflowing, not_centered, invisible, overlapping, wrong_size, or auto — and get a ranked culprit list in plain language with deterministic measured evidence ('ancestor e2 has overflow:hidden; content exceeds it by 34px on the right'). auto runs the cheap ordered battery and reports what trips. THE tool to call when assert_visual returns FAIL and you need the cause, or when the user says 'it looks broken' without saying why. Fix the named culprit, then re-run assert_visual.",
+  responsive_sweep:
+    "Re-run a verification across viewports in ONE call and get a per-viewport verdict matrix — the cure for 'looks right at 1280, broken on mobile'. run: { suite_id } re-runs a registered assert_visual suite (selectors re-resolve at each width), run: { assertions: [...] } runs inline claims, run: { diagnose: {...} } probes a symptom per viewport. Defaults to 375/768/1280/1920; passing cells collapse to PASS, failing cells carry the failed assertions with measured values; the original viewport is restored afterwards. Run it before claiming any responsive work is done.",
+  capture_proof:
+    "Before/after evidence bundle proving a fix worked: call with phase:'before' ahead of the change and phase:'after' once assert_visual passes — each phase captures an annotated screenshot (marked with your target uids, saved to disk as file paths) and, with suite_id, attaches the suite verdict; the 'after' call returns a verdict_delta (FAIL→PASS per assertion). Use it to close the loop with humans: 'here is the before, the after, and the measured verdicts'. Bundles persist under the artifacts dir keyed by bundle_id.",
   check_alignment:
-    "Pixel-perfect audit for a GROUP of elements (a selector's matches or a uid list): which edges/centers align and which element is off by how many px, gap rhythm with outliers ('gaps median 24px — e5→e6 is +7.5px'), size consistency, optional N-px grid conformance, and pixel-snap warnings (fractional device pixels render blurry). Reach for it on 'unevenly spaced', 'one card sits lower', 'the nav items look off', 'nothing lines up'. For ONE element's internal glyph centering use measure_element instead.",
+    "DEPRECATED — use assert_visual (aligned_edges / equal_height / equal_width / spacing_equals assertions), which adds PASS/FAIL verdicts and re-runnable suites. Still functional for one release: pixel-perfect audit for a GROUP of elements (a selector's matches or a uid list): which edges/centers align and which element is off by how many px, gap rhythm with outliers, size consistency, optional N-px grid conformance, and pixel-snap warnings.",
   pick_color:
     "Sample the ACTUAL painted pixel at a point or element — the composited truth that computed styles cannot give (gradients, background images, opacity stacks, blend modes) — plus the owning element's computed color/background and a WCAG contrast verdict (AA/AAA) of the text against the painted backdrop. Reach for it on 'the color looks off', 'is this the exact brand hex?', 'is this text readable on that background?'. Use at:'top-left' to sample pure background (center may hit a glyph); use explain_styles to find WHICH RULE set a wrong color.",
   inject_css:
@@ -289,6 +307,12 @@ export function createServer(session: SessionManager): McpServer {
     measureElementTool,
     evaluateTool,
     injectCssTool,
+    assertVisualTool,
+    visualDiffTool,
+    impactPreviewTool,
+    diagnoseTool,
+    responsiveSweepTool,
+    captureProofTool,
     checkAlignmentTool,
     pickColorTool,
   ]

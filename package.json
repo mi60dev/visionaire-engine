@@ -1,6 +1,6 @@
 {
   "name": "visionaire-engine",
-  "version": "0.6.2",
+  "version": "0.7.0",
   "description": "Deterministic rendered-page \u2192 LLM context MCP server: which rule, which file, which line \u2014 and why it wins.",
   "type": "module",
   "bin": {
@@ -41,6 +41,7 @@
   "files": [
     "dist/",
     "docs/",
+    "harness/",
     "README.md",
     "LICENSE",
     "NOTICE"

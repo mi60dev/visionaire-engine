@@ -1,0 +1,46 @@
+<!doctype html>
+<!--
+  sweep.html — fixture for responsive_sweep / capture_proof e2e.
+
+  Load-bearing geometry (deterministic: fixed font-size/line-height, no web fonts):
+    * .cards is a flex ROW above 800px viewport width; default align-items:stretch
+      makes both .card border boxes EQUAL height (card A has two text lines via <br>,
+      card B stretches to match) → equal_height PASSes at 1280x800.
+    * @media (max-width: 800px): .cards becomes a COLUMN and .card--b gains
+      padding-bottom:56px. Card A: 2*20px text + 32px padding + 2px border = 74px.
+      Card B: 20px text + 16px top + 56px bottom padding + 2px border = 94px.
+      Heights differ by 20px → equal_height FAILs at 375x812.
+    * #wide is a fixed 500px-wide box inside #clip (overflow:hidden, full content
+      width). At 375px viewport #clip is ~335px wide (body padding 20px each side)
+      so #wide is clipped on the right; at 1280px #clip is ~1240px and #wide fits
+      → the diagnose 'clipped' probe detects the symptom only at narrow widths.
+    * The <h1> exists so annotated_screenshot's default mark discovery always
+      finds at least one landmark element.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>sweep fixture</title>
+<style>
+  * { margin: 0; box-sizing: border-box; }
+  body { font-family: sans-serif; font-size: 16px; line-height: 20px; padding: 20px; }
+  h1 { font-size: 16px; line-height: 20px; margin-bottom: 16px; }
+  .cards { display: flex; gap: 16px; }
+  .card { flex: 1 1 0; background: #e3f2fd; border: 1px solid #90caf9; padding: 16px; }
+  #clip { overflow: hidden; margin-top: 24px; border: 1px solid #cccccc; }
+  #wide { width: 500px; height: 40px; background: #ffcc80; }
+  @media (max-width: 800px) {
+    .cards { flex-direction: column; }
+    .card--b { padding-bottom: 56px; }
+  }
+</style>
+</head>
+<body>
+<h1>Sweep fixture</h1>
+<div class="cards">
+  <div class="card card--a">Card A<br>two lines of text</div>
+  <div class="card card--b">Card B</div>
+</div>
+<div id="clip"><div id="wide">wide element</div></div>
+</body>
+</html>

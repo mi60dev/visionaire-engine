@@ -7,6 +7,16 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { createServer } from './server.js'
 import { SessionManager } from './session.js'
 
+if (process.argv[2] === 'init-harness') {
+  const { initHarness } = await import('./harness-init.js')
+  process.exit(await initHarness(process.argv.slice(3)))
+}
+if (process.argv[2] === '--help' || process.argv[2] === '-h') {
+  console.error('usage: visionaire-engine — start the MCP server on stdio')
+  console.error('       visionaire-engine init-harness [--claude|--cursor] [--force] — install hooks')
+  process.exit(0)
+}
+
 const session = new SessionManager()
 const server = createServer(session)
 
