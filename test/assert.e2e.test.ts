@@ -368,6 +368,34 @@ describe.skipIf(!chromePath)('assert_visual e2e — real Chrome', () => {
     }
   })
 
+  it('not_overlapped sees occluders that were NEVER inside any viewport (below the fold at scroll 0)', async () => {
+    // Sharper variant of the scroll-invariance guard: the #deep-* trio sits at
+    // doc y 1610+, below even the max-scrolled 800px viewport, so Chrome has
+    // never painted it. Candidate discovery must still find #deep-badge over
+    // #deep-base — a viewport-bound source (elementFromPoint, viewport
+    // screenshot) would return a false PASS here. #deep-clear proves the other
+    // direction: off-screen + genuinely clear must stay PASS, not blanket-FAIL.
+    const { cdp } = session.context()
+    const scroll = await cdp.send('Runtime.evaluate', { expression: 'window.scrollY', returnByValue: true })
+    expect(scroll.result.value).toBe(0) // precondition: the trio really is below the fold
+    const env = await run({
+      detail: 'full',
+      assertions: [
+        { id: 'deep-ovl', type: 'not_overlapped', targets: [{ selector: '#deep-base' }] },
+        { id: 'deep-clear', type: 'not_overlapped', targets: [{ selector: '#deep-clear' }] },
+      ],
+    })
+    const ovl = byId(env, 'deep-ovl')
+    expect(ovl.verdict).toBe('FAIL')
+    expect((ovl.measured as { candidates_above: number }).candidates_above).toBe(1)
+    expect(ovl.explanation).toContain('#deep-badge')
+    // Full-document coordinates, not viewport-clipped geometry.
+    expect((ovl.measured as { overlap_rect: unknown }).overlap_rect).toEqual({ x: 580, y: 1620, width: 20, height: 20 })
+    const clear = byId(env, 'deep-clear')
+    expect(clear.verdict).toBe('PASS')
+    expect((clear.measured as { candidates_above: number }).candidates_above).toBe(0)
+  })
+
   it('visible passes for border-only boxes; size_equals sees through transforms', async () => {
     const env = await run({
       assertions: [

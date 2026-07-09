@@ -15,6 +15,10 @@
   - #trunc: 120w nowrap ellipsis with long text → scrollWidth > clientWidth.
   - #hidden: display:none. #offscreen: (20,1500) 100x40, background #dddddd — outside a 1280x800
     viewport at scroll (0,0), fully inside it at scroll (0,800). Body is 1600px tall.
+  - #deep-base / #deep-badge / #deep-clear: the #base/#badge/#sized story replayed at doc y 1610+,
+    BELOW body's 1600px box — no scroll position used by the suite ever brings them into an 800px
+    viewport, so they are never painted. #deep-badge (z-index 5) overlaps #deep-base by 20x20px at
+    (580,1620); #deep-clear must never be intersected by anything (not_overlapped PASS off-screen).
   - #save-btn: <button> named "Save" at (900,720) 120x40 — the ONLY role=button (role+name targeting).
   - #abs-escape: position:absolute child of the STATIC overflow:hidden #abs-clipper (100x100 at
     (950,460)); its containing block is the position:relative #abs-wrap, so it escapes the clip and
@@ -68,6 +72,9 @@
             border: 2px solid #333333; background: #eeeeee; box-sizing: content-box;
             transform: scale(2); transform-origin: top left; }
   #portal { position: fixed; left: 0; top: 0; right: 0; bottom: 0; pointer-events: none; }
+  #deep-base  { position: absolute; left: 500px; top: 1620px; width: 100px; height: 40px; background: #ccffff; }
+  #deep-badge { position: absolute; left: 580px; top: 1610px; width: 40px;  height: 30px; background: #ff00cc; z-index: 5; }
+  #deep-clear { position: absolute; left: 700px; top: 1620px; width: 100px; height: 40px; background: #dddddd; }
 </style>
 </head>
 <body>
@@ -100,6 +107,9 @@
   <div id="cage-zone"><div id="cage"><div id="caged"></div></div></div>
   <div id="rule"></div>
   <div id="scaled"></div>
+  <div id="deep-base"></div>
+  <div id="deep-badge"></div>
+  <div id="deep-clear"></div>
   <div id="portal"></div>
 </body>
 </html>
