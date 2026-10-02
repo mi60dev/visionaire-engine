@@ -14,7 +14,7 @@
 
 **The solution:** Visionaire reads the live page and hands the LLM the exact rule, file, and line. Right fix, first try.
 
-![Endless re-prompting vs one pinpointed fix — the problem Visionaire solves](hero-2.jpeg)
+![The loop vs the fix: without Visionaire, seven re-prompts and still broken; with it, one call names the winning rule .hero .cta at theme.css:104 and the rule it beat](hero-2.png)
 
 **You shouldn't have to write a paragraph to explain a 2px margin bug — and now you don't.** Less explaining, more fixing: built for developers, vibe coders, and anyone shipping site design changes with an LLM in the loop.
 
