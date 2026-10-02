@@ -236,3 +236,7 @@ WSL more memory (`.wslconfig`), and to see the full Chrome stderr run
 or similar). Chrome needs a set of shared libs. Installing Google Chrome via the
 `.deb` above pulls them in automatically; a manually-downloaded Chrome for Testing
 may not. On Debian/Ubuntu: `sudo apt-get install -y libnss3 libatk-bridge2.0-0 libgbm1 libasound2`.
+
+## WSL: use your Windows browser instead of a Linux Chrome
+
+If Chrome in WSL is painful, skip it: install the Visionaire Bridge extension in your Windows Chrome/Edge/Firefox and call `connect { mode: "extension", url }`. The server in WSL is reached through WSL's localhost forwarding (best with `networkingMode=mirrored` in `.wslconfig`). Setup and checks: [extension/README.md → Windows with WSL](../extension/README.md#windows-with-wsl).

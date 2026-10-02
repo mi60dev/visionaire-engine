@@ -16,9 +16,9 @@ Tailwind classes, template/JSX markup, inline styles). If in doubt, verify.
    multiple visual roles, tell the user what will be touched before you edit.
 2. Make the smallest edit that could fix the issue.
 3. AFTER the edit, verify — do NOT claim success from reading the code:
-   - If a suite exists for this area, call assert_visual { suite_id }.
+   - If a suite exists for this area, call solve { intent:"verify", tool:"assert_visual", args:{ suite_id } }.
    - Otherwise state your claim as assertions, e.g.
-     assert_visual { assertions: [{ type:"equal_height", targets:[{selector:".card"}] }] }.
+     solve { intent:"verify", tool:"assert_visual", args:{ assertions: [{ type:"equal_height", targets:[{selector:".card"}] }] } }.
 4. If the verdict is FAIL, read measured and offending_uids, then call
    diagnose { uid: <offending uid>, symptom:"auto" } and fix the named culprit.
    Repeat from step 2. Do not tell the user it is fixed until the verdict is PASS.

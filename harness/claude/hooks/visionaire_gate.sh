@@ -26,7 +26,7 @@ pending=.claude/.visionaire_pending
 verified=.claude/.visionaire_verified
 
 if [ -f "$pending" ] && [ ! -f "$verified" ]; then
-  printf '%s\n' '{"decision":"block","reason":"You edited a rendering file this turn but have not run a Visionaire verification pass. Call assert_visual (or the relevant suite / responsive_sweep) and confirm a PASS verdict before finishing. Do not claim the visual change works without the measured verdict."}'
+  printf '%s\n' '{"decision":"block","reason":"You edited a rendering file this turn but have not run a Visionaire verification pass. Call solve with tool: assert_visual (or the relevant suite / responsive_sweep) and confirm a PASS verdict before finishing. Do not claim the visual change works without the measured verdict."}'
   exit 0
 fi
 

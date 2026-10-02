@@ -1,0 +1,30 @@
+:root {
+  --bg: #ffffff; --fg: #1c1b22; --muted: #6b6a75; --line: #e6e4ee;
+  --accent: #6d28d9; --accent-fg: #ffffff; --warn: #b45309; --warn-bg: #fff7ed; --ok: #15803d;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #1c1b22; --fg: #f1f0f5; --muted: #a3a1ad; --line: #34323d; --accent: #a78bfa; --accent-fg: #1c1b22; --warn: #fbbf24; --warn-bg: #3a2a10; --ok: #4ade80; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; width: 340px; background: var(--bg); color: var(--fg); font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+header { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+h1 { font-size: 14px; margin: 0; flex: 1; }
+h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 0 0 6px; }
+section { padding: 10px 14px; border-bottom: 1px solid var(--line); }
+.chip { font-size: 11px; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+.muted { color: var(--muted); margin: 0; }
+.row { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
+.row .grow { flex: 1; min-width: 0; }
+.row .title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .sub { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); flex: none; }
+.dot.warn { background: var(--warn); }
+.callout { background: var(--warn-bg); color: var(--fg); border-radius: 6px; padding: 8px; margin: 4px 0; }
+button { font: inherit; cursor: pointer; border-radius: 6px; border: 1px solid var(--accent); background: var(--accent); color: var(--accent-fg); padding: 4px 10px; }
+button.secondary { background: transparent; color: var(--accent); }
+button.link { border: 0; background: none; color: var(--accent); padding: 4px 0; }
+button.danger { color: var(--warn); }
+.settings label { display: flex; gap: 6px; align-items: center; padding: 2px 0; }
+.sub.warn { color: var(--warn); }
+input[type=text] { flex: 1; min-width: 0; font: 600 13px ui-monospace, Menlo, monospace; letter-spacing: .05em; padding: 5px 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); text-transform: uppercase; }
+input.port { width: 80px; font: inherit; padding: 2px 6px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); }

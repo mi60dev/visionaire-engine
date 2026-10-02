@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Visionaire — allow site?</title>
+  <link rel="stylesheet" href="popup.css">
+  <style>
+    body { width: auto; min-height: 100vh; }
+    main { padding: 16px 18px; display: grid; gap: 12px; }
+    .origin { font: 600 15px ui-monospace, Menlo, monospace; word-break: break-all; }
+    .url { font-size: 12px; color: var(--muted); word-break: break-all; }
+    .buttons { display: flex; gap: 8px; flex-wrap: wrap; }
+  </style>
+</head>
+<body>
+  <header>
+    <img src="icons/icon-32.png" alt="" width="20" height="20">
+    <h1>Allow your coding agent to open this site?</h1>
+  </header>
+  <main>
+    <div>
+      <div class="origin" id="origin"></div>
+      <div class="url" id="url"></div>
+    </div>
+    <p class="callout">It will see this site <strong>as you</strong> — signed in with your cookies — so it can inspect styles and layout. Only allow sites you are debugging.</p>
+    <p class="muted" id="why"></p>
+    <div class="buttons">
+      <button id="once">Allow once</button>
+      <button id="always" class="secondary">Always allow this site</button>
+      <button id="deny" class="secondary">Deny</button>
+    </div>
+  </main>
+  <script type="module" src="approve.js"></script>
+</body>
+</html>
