@@ -1,0 +1,11 @@
+<!doctype html><html><head><style>
+html,body{margin:0;overflow:hidden;background:#123}
+body.sim{width:3840px;height:2160px}
+#stage{position:absolute;left:0;top:0;width:3840px;height:2160px;background:linear-gradient(90deg,#246,#642)}
+.row{position:absolute;left:100px;width:3600px;height:300px;background:#fa3;color:#000;font:120px sans-serif}
+#clock{position:absolute;right:40px;top:40px;width:400px;height:150px;background:#0f0;font:100px sans-serif}
+#footer{position:absolute;left:0;bottom:0;width:3840px;height:160px;background:#f0f}
+#stage{transform:scale(.5);transform-origin:0 0}
+</style></head><body class="sim"><div id="stage">
+<div class="row" style="top:400px">Row 1</div><div class="row" style="top:1200px">Row 2</div><div class="row" style="top:1700px">Row 3</div>
+<div id="clock">12:00</div><div id="footer">footer</div></div></body></html>

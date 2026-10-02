@@ -2,6 +2,7 @@
  * style_diff — record whitelisted computed styles + box model for a target,
  * later compare and emit only the deltas (verify-my-fix loops). SPEC §4.
  */
+import { captureViewport } from '../engine/capture.js'
 import { z } from 'zod'
 import type {
   Bounds,
@@ -82,8 +83,7 @@ async function record(ctx: ToolContext, a: TargetSpec, slot: string, capturePixe
   slots.set(slot, { selector, uid: node.uid, values, box })
   let pixelNote = ''
   if (capturePixels) {
-    const shot = await ctx.cdp.send('Page.captureScreenshot', { format: 'png' })
-    saveBaselinePixels(slot, Buffer.from(shot.data, 'base64'))
+    saveBaselinePixels(slot, Buffer.from(await captureViewport(ctx), 'base64'))
     pixelNote = ` pixel baseline saved — compare with visual_diff { reference: { baseline_slot: '${slot}' } }.`
   }
   const boxNote = box ? ' + box model' : ' (no box model — element has no layout box)'

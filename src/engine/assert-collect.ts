@@ -10,6 +10,8 @@
  * across scroll positions. One Runtime.callFunctionOn per element; DOMSnapshot
  * and the screenshot are captured lazily, at most once per runAssertions call.
  */
+import { cssBounds, snapshotScale } from './snapshot-scale.js'
+import { captureViewport } from './capture.js'
 import type { Protocol } from 'puppeteer-core'
 import type { Bounds, ResolvedNode, ToolContext } from '../types.js'
 import { pairAttributes, resolveTarget } from '../uid.js'
@@ -464,6 +466,8 @@ export async function buildPaintIndex(ctx: ToolContext): Promise<PaintIndex> {
     computedStyles: [...PAINT_STYLES],
     includePaintOrder: true,
   })
+  // Headful HiDPI windows report snapshot rects in device px; everything here compares CSS px.
+  const scale = await snapshotScale(ctx)
   const doc = snap.documents[0]
   const empty: PaintIndex = { orderOf: () => undefined, candidatesAbove: () => [], intersecting: () => [] }
   if (!doc) return empty
@@ -484,11 +488,7 @@ export async function buildPaintIndex(ctx: ToolContext): Promise<PaintIndex> {
   backendIds.forEach((b, i) => {
     if (!nodeIdxByBackend.has(b)) nodeIdxByBackend.set(b, i)
   })
-  const boundsOf = (row: number): Bounds | undefined => {
-    const r = layout.bounds[row]
-    if (!r || r.length < 4) return undefined
-    return { x: r[0]!, y: r[1]!, width: r[2]!, height: r[3]! }
-  }
+  const boundsOf = (row: number): Bounds | undefined => cssBounds(layout.bounds[row], scale)
   const orderOfIdx = (i: number): number | undefined => {
     const row = rowByNode.get(i)
     return row === undefined ? undefined : layout.paintOrders?.[row]
@@ -614,8 +614,7 @@ export async function buildPaintIndex(ctx: ToolContext): Promise<PaintIndex> {
 
 async function captureViewportPng(ctx: ToolContext): Promise<DecodedPng | undefined> {
   try {
-    const shot = await ctx.cdp.send('Page.captureScreenshot', { format: 'png' })
-    return decodePng(Buffer.from(shot.data, 'base64'))
+    return decodePng(Buffer.from(await captureViewport(ctx), 'base64'))
   } catch {
     return undefined
   }
