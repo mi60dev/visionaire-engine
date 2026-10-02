@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Visionaire hero</title>
+<style>
+  :root {
+    --bg: #0b0d1a; --panel: #12152a; --panel2: #171b34; --line: #262b4d; --fg: #e8e9f5; --muted: #8a8fb3;
+    --purple: #8b5cf6; --purple-d: #6d28d9; --cyan: #22d3ee; --green: #34d399; --red: #f87171; --amber: #fbbf24;
+    --mono: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+    --sans: -apple-system, "SF Pro Display", "Segoe UI", Inter, system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1280px; height: 720px; background: var(--bg); overflow: hidden; }
+  body { font-family: var(--sans); color: var(--fg); position: relative; }
+  .grid { position: absolute; inset: 0; background-image: linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px); background-size: 40px 40px; opacity: .28; mask-image: radial-gradient(ellipse at 50% 55%, #000 30%, transparent 78%); }
+  .glow { position: absolute; width: 760px; height: 420px; left: 260px; top: 230px; background: radial-gradient(ellipse, rgba(139,92,246,.30), transparent 70%); filter: blur(30px); }
+
+  header { position: absolute; left: 64px; top: 46px; right: 64px; display: flex; align-items: center; gap: 18px; }
+  .logo { width: 52px; height: 52px; border-radius: 13px; background: var(--purple-d); display: grid; place-items: center; box-shadow: 0 0 40px rgba(139,92,246,.55); }
+  .logo i { width: 30px; height: 30px; border-radius: 50%; border: 4px solid #fff; display: grid; place-items: center; }
+  .logo i::after { content: ""; width: 10px; height: 10px; border-radius: 50%; background: #fff; }
+  .title { font-size: 34px; font-weight: 800; letter-spacing: -.5px; }
+  .title span { color: var(--purple); }
+  .tag { font-size: 21px; color: var(--muted); margin-top: 2px; letter-spacing: -.1px; }
+  .tag b { color: var(--fg); font-weight: 600; }
+  .chips { margin-left: auto; display: flex; gap: 8px; }
+  .chip { font: 600 13px var(--sans); padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: rgba(23,27,52,.8); color: var(--muted); }
+  .chip.on { color: var(--green); border-color: rgba(52,211,153,.35); }
+
+  /* browser */
+  .browser { position: absolute; left: 64px; top: 150px; width: 560px; height: 500px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; box-shadow: 0 30px 80px rgba(0,0,0,.5); }
+  .chrome { height: 44px; display: flex; align-items: center; gap: 8px; padding: 0 14px; background: var(--panel2); border-bottom: 1px solid var(--line); }
+  .dot { width: 11px; height: 11px; border-radius: 50%; background: #3a3f63; }
+  .url { flex: 1; margin-left: 10px; height: 26px; border-radius: 7px; background: #0e1124; color: var(--muted); font: 13px var(--mono); display: flex; align-items: center; padding: 0 10px; }
+  .url b { color: var(--fg); font-weight: 500; }
+  .ext { position: relative; width: 26px; height: 26px; border-radius: 7px; background: var(--purple-d); display: grid; place-items: center; }
+  .ext i { width: 15px; height: 15px; border-radius: 50%; border: 2.5px solid #fff; }
+  .ext em { position: absolute; right: -6px; top: -6px; font: 700 10px var(--sans); font-style: normal; background: var(--green); color: #06281c; border-radius: 999px; padding: 1px 5px; }
+  .bar { height: 30px; display: flex; align-items: center; gap: 8px; padding: 0 14px; font: 12px var(--sans); color: #c4b5fd; background: rgba(109,40,217,.18); border-bottom: 1px solid rgba(139,92,246,.35); }
+  .bar .x { margin-left: auto; color: var(--muted); }
+
+  .page { position: relative; padding: 26px 30px; background: #f6f7fb; height: calc(100% - 74px); color: #1d2140; }
+  .nav { display: flex; gap: 14px; align-items: center; margin-bottom: 30px; }
+  .nav .brand { width: 90px; height: 12px; border-radius: 3px; background: #1d2140; }
+  .nav .ln { width: 44px; height: 8px; border-radius: 3px; background: #c7cad9; }
+  .nav .ln:first-of-type { margin-left: auto; }
+  .h1 { width: 330px; height: 22px; border-radius: 5px; background: #1d2140; margin-bottom: 12px; }
+  .p { width: 420px; height: 9px; border-radius: 4px; background: #c7cad9; margin-bottom: 8px; }
+  .p.s { width: 300px; }
+  .cta-wrap { position: relative; margin-top: 54px; display: inline-block; }
+  .cta { position: relative; z-index: 1; font: 600 15px var(--sans); color: #fff; background: #2563eb; padding: 12px 26px; border-radius: 9px; display: inline-block; }
+  .hl { position: absolute; inset: -7px; border: 2px solid var(--purple); border-radius: 12px; background: rgba(139,92,246,.10); }
+  .mb { position: absolute; left: -7px; right: -7px; top: calc(100% + 7px); height: 24px; background: repeating-linear-gradient(45deg, rgba(251,191,36,.35) 0 6px, rgba(251,191,36,.12) 6px 12px); border: 1px dashed var(--amber); border-top: 0; border-radius: 0 0 6px 6px; }
+  .mb span { position: absolute; right: -78px; top: 3px; font: 600 12px var(--mono); color: #b45309; }
+  .label { position: absolute; left: -7px; top: -34px; font: 600 12px var(--mono); color: #fff; background: var(--purple-d); padding: 4px 8px; border-radius: 6px; white-space: nowrap; }
+  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 52px; }
+  .card { height: 120px; border-radius: 10px; background: #fff; border: 1px solid #e3e5ef; padding: 14px; }
+  .card i { display: block; height: 52px; border-radius: 6px; background: #e8eaf3; margin-bottom: 10px; }
+  .card b { display: block; height: 8px; width: 80%; border-radius: 3px; background: #c7cad9; margin-bottom: 7px; }
+  .card b + b { width: 55%; }
+
+  /* connector */
+  .wire { position: absolute; left: 624px; top: 395px; width: 52px; height: 2px; background: linear-gradient(90deg, var(--purple), var(--cyan)); box-shadow: 0 0 14px var(--purple); }
+  .wire::before, .wire::after { content: ""; position: absolute; top: -4px; width: 10px; height: 10px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 12px var(--cyan); }
+  .wire::before { left: -5px; background: var(--purple); box-shadow: 0 0 12px var(--purple); }
+  .wire::after { right: -5px; }
+  .wlabel { position: absolute; left: 600px; top: 404px; width: 100px; text-align: center; font: 600 10px var(--mono); color: var(--muted); letter-spacing: .3px; }
+
+  /* agent terminal */
+  .term { position: absolute; left: 676px; top: 150px; width: 540px; height: 500px; background: #0d1020; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; box-shadow: 0 30px 80px rgba(0,0,0,.5); }
+  .term .chrome { background: #12152a; }
+  .term .chrome .t { font: 12px var(--sans); color: var(--muted); margin-left: 8px; }
+  .code { padding: 22px 22px; font: 14px/1.72 var(--mono); color: #c9cbe3; white-space: pre; }
+  .you { color: var(--fg); }
+  .you::before { content: "› "; color: var(--purple); }
+  .call { color: var(--muted); }
+  .call b { color: var(--cyan); font-weight: 600; }
+  .s { color: #a5f3fc; }
+  .route { color: var(--purple); font-weight: 600; }
+  .k { color: var(--fg); font-weight: 700; }
+  .win { color: var(--green); font-weight: 700; }
+  .lost { color: var(--red); }
+  .file { color: var(--amber); }
+  .dim { color: #5d6390; }
+  .next { color: var(--cyan); font-weight: 600; }
+  .note { color: #fcd34d; }
+
+  footer { position: absolute; left: 64px; right: 64px; bottom: 24px; display: flex; gap: 22px; font: 13px var(--sans); color: var(--muted); }
+  footer b { color: var(--fg); font-weight: 600; }
+  footer .sep { color: #3a3f63; }
+</style>
+</head>
+<body>
+  <div class="grid"></div>
+  <div class="glow"></div>
+
+  <header>
+    <div class="logo"><i></i></div>
+    <div>
+      <div class="title">Visionaire <span>Engine</span></div>
+      <div class="tag">Which rule, which file, which line — <b>and why it wins.</b></div>
+    </div>
+    <div class="chips">
+      <span class="chip on">● Chrome</span>
+      <span class="chip on">● Firefox</span>
+      <span class="chip">MCP</span>
+      <span class="chip">no AI inside</span>
+    </div>
+  </header>
+
+  <div class="browser">
+    <div class="chrome">
+      <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+      <div class="url">https://<b>app.acme.dev</b>/pricing</div>
+      <div class="ext"><i></i><em>1</em></div>
+    </div>
+    <div class="bar">◉ Visionaire Bridge is inspecting this tab — your browser, your login <span class="x">Revoke</span></div>
+    <div class="page">
+      <div class="nav"><span class="brand"></span><span class="ln"></span><span class="ln"></span><span class="ln"></span></div>
+      <div class="h1"></div>
+      <div class="p"></div>
+      <div class="p s"></div>
+      <div class="cta-wrap">
+        <div class="label">e7 · a.btn · 146×42</div>
+        <div class="hl"></div>
+        <span class="cta">Get started</span>
+        <div class="mb"><span>24px ?!</span></div>
+      </div>
+      <div class="cards">
+        <div class="card"><i></i><b></b><b></b></div>
+        <div class="card"><i></i><b></b><b></b></div>
+        <div class="card"><i></i><b></b><b></b></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wire"></div>
+
+  <div class="term">
+    <div class="chrome"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="t">coding agent · visionaire MCP</span></div>
+<div class="code"><span class="you">why is there a big gap under "Get started"?</span>
+
+<span class="call"><b>solve</b>({ intent: <span class="s">"gap under Get started"</span>,
+        context: { element: <span class="s">"Get started"</span> } })</span>
+
+<span class="route">solve → spacing-wrong</span>   <span class="dim">target e7 a.btn</span>
+<span class="k">margin-bottom = 24px</span>
+  <span class="win">WINNER</span> .hero-cta .btn   <span class="dim">spec 0,2,0</span>
+         → <span class="file">src/styles/theme.css:10</span>
+  <span class="lost">lost  </span> .btn { 12px }   <span class="dim">lower specificity</span>
+         → <span class="file">vendor/plugin.css:5</span>
+  <span class="note">scope</span>  rule styles 6 elements — scoped fix:
+         <span class="s">.hero-cta > .btn</span>
+
+<span class="next">NEXT</span> <span class="dim">trial it live:</span> inject_css { margin-bottom: 12px }
+<span class="dim">deterministic · ~180 tokens · 1 call</span></div>
+  </div>
+
+  <footer>
+    <span><b>Your real browser</b> via a Chrome / Firefox extension</span><span class="sep">·</span>
+    <span><b>Cascade winners &amp; losers</b> with file:line</span><span class="sep">·</span>
+    <span><b>Visibility, overlap, animations, listeners</b></span>
+  </footer>
+</body>
+</html>

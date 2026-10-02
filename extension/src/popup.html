@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Visionaire Bridge</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <img src="icons/icon-32.png" alt="" width="20" height="20">
+    <h1>Visionaire Bridge</h1>
+    <span id="mode" class="chip"></span>
+  </header>
+
+  <section>
+    <h2>MCP servers</h2>
+    <div id="servers"><p class="muted">Looking for a running Visionaire MCP server…</p></div>
+    <button id="rescan" class="link">Rescan</button>
+  </section>
+
+  <section>
+    <h2>This tab</h2>
+    <div id="current"></div>
+  </section>
+
+  <section>
+    <h2>Tabs the agent can see</h2>
+    <div id="tabs"><p class="muted">None. Share this tab, or let the agent open its own.</p></div>
+  </section>
+
+  <section>
+    <h2>Sites the agent may always open</h2>
+    <div id="sites"></div>
+  </section>
+
+  <section class="settings">
+    <label><input type="checkbox" id="allowOpen"> Allow the agent to open tabs</label>
+    <label><input type="checkbox" id="openActive"> Bring agent tabs to the front</label>
+    <label>Bridge port <input type="number" id="basePort" min="1024" max="65519" class="port"> <span class="sub">(match VISIONAIRE_BRIDGE_PORT)</span></label>
+    <button id="repair" class="link danger">Reset pairing</button>
+  </section>
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

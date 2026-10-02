@@ -9,6 +9,10 @@ import path from 'node:path'
 import puppeteer from 'puppeteer-core'
 import type { Browser, CDPSession, LaunchOptions, Page, Protocol } from 'puppeteer-core'
 import { ScriptRegistry } from './attribution/scripts.js'
+import { ExtensionCdpTransport, type AttachInfo } from './bridge/cdp-transport.js'
+import { LiteSession } from './bridge/lite.js'
+import type { BridgeClient, BridgeServer } from './bridge/server.js'
+import type { BridgeTab } from './bridge/protocol.js'
 import { StylesheetRegistry } from './attribution/stylesheets.js'
 import type { ToolContext } from './types.js'
 import { UidRegistry } from './uid.js'
@@ -92,6 +96,16 @@ async function enableDebugger(cdp: CDPSession): Promise<void> {
   await cdp.send('Debugger.setSkipAllPauses', { skip: true })
 }
 
+/**
+ * DOM.pushNodesByBackendIdsToFrontend fails with "Document needs to be requested first"
+ * until DOM.getDocument has run in this session — and every navigation invalidates it.
+ * uids minted via Runtime/DOMSnapshot would otherwise be unresolvable as a session's
+ * first DOM call (field report: first solve in a fresh extension session).
+ */
+async function requestDocument(cdp: CDPSession): Promise<void> {
+  await cdp.send('DOM.getDocument', { depth: 0 }).catch(() => {})
+}
+
 export function findChromeExecutable(): string | undefined {
   const envPath = process.env['CHROME_PATH']
   if (envPath && fs.existsSync(envPath)) return envPath
@@ -134,6 +148,26 @@ function findSystemChrome(): string | undefined {
     if (found && fs.existsSync(found)) return found
   }
   return undefined
+}
+
+/**
+ * Attach mode drives a browser over its DevTools endpoint; an off-host endpoint would let a
+ * prompt-injected agent connect puppeteer anywhere. Loopback only unless explicitly allowed.
+ */
+export function assertLoopbackDebugUrl(url: string): void {
+  if (process.env['VISIONAIRE_ALLOW_REMOTE_ATTACH'] === '1') return
+  let host = ''
+  try {
+    host = new URL(url).hostname
+  } catch {
+    throw new Error(`browserUrl is not a valid URL: ${url}`)
+  }
+  if (!['127.0.0.1', 'localhost', '[::1]', '::1'].includes(host)) {
+    throw new Error(
+      `browserUrl must point at this machine (127.0.0.1/localhost), got ${host}. ` +
+        'Set VISIONAIRE_ALLOW_REMOTE_ATTACH=1 in the MCP server env to allow remote DevTools endpoints.',
+    )
+  }
 }
 
 const NO_SANDBOX_ARGS = ['--no-sandbox', '--disable-setuid-sandbox']
@@ -218,22 +252,66 @@ async function launchChrome(base: LaunchOptions): Promise<Browser> {
   }
 }
 
+export type SessionMode = 'launch' | 'attach' | 'extension'
+
 export interface ConnectOptions {
-  mode?: 'launch' | 'attach'
+  mode?: SessionMode
   url?: string
+  /** Extension mode: inspect this already-shared tab instead of the most recent one. */
+  tabId?: number
+  /** Extension mode: prefer this browser when several extensions are connected. */
+  browser?: 'chrome' | 'firefox'
   browserUrl?: string
   headless?: boolean
   width?: number
   height?: number
 }
 
+/** How long connect({mode:'extension'}) waits for the extension to dial in (MV3 workers wake on a 30s alarm). */
+const EXTENSION_WAIT_MS = Math.max(1_000, Number(process.env['VISIONAIRE_EXTENSION_WAIT_MS']) || 35_000)
+
 export class SessionManager {
   private browser?: Browser
   private ctx?: ToolContext
-  private mode: 'launch' | 'attach' = 'launch'
+  private mode: SessionMode = 'launch'
+  /** Firefox extension sessions: DOM/CSSOM collector instead of CDP. */
+  private liteSession?: LiteSession
+  /** Extension-mode bookkeeping, for status lines. */
+  private extensionTab?: { client: BridgeClient; tabId: number; owned: boolean }
+  /** Set when an extension session ended underneath us (user cancelled the debug bar, tab closed…). */
+  private lostReason?: string
 
-  async connect(opts: ConnectOptions = {}): Promise<ToolContext> {
+  constructor(readonly bridge?: BridgeServer) {}
+
+  get currentMode(): SessionMode {
+    return this.mode
+  }
+
+  /** Non-undefined when the active session is a Firefox (lite) extension session. */
+  get lite(): LiteSession | undefined {
+    return this.liteSession
+  }
+
+  get lostSessionReason(): string | undefined {
+    return this.lostReason
+  }
+
+  get connected(): boolean {
+    return !!this.ctx || !!this.liteSession
+  }
+
+  /** One line describing the live session (for tool output). */
+  describe(): string {
+    if (this.liteSession) return `extension/${this.liteSession.client.browser} tab ${this.liteSession.tabId} (lite: DOM/CSSOM)`
+    if (this.extensionTab) return `extension/${this.extensionTab.client.browser} tab ${this.extensionTab.tabId} (full CDP)`
+    return this.mode
+  }
+
+  async connect(opts: ConnectOptions = {}): Promise<ToolContext | undefined> {
     await this.disconnect()
+    this.lostReason = undefined
+
+    if (opts.mode === 'extension') return this.connectExtension(opts)
 
     const mode = opts.mode ?? (opts.browserUrl ? 'attach' : 'launch')
     const width = opts.width ?? 1280
@@ -249,6 +327,7 @@ export class SessionManager {
       // null viewport: keep the real window size of the browser we attach to.
       // protocolTimeout: a CDP call that never resolves must error fast, not hang
       // the tool call (field report: 4-minute client-side MCP timeouts).
+      assertLoopbackDebugUrl(opts.browserUrl)
       browser = await puppeteer.connect({
         browserURL: opts.browserUrl,
         defaultViewport: null,
@@ -290,7 +369,18 @@ export class SessionManager {
       if (mode === 'attach' && (opts.width !== undefined || opts.height !== undefined)) {
         await page.setViewport({ width, height })
       }
+      this.ctx = await this.initPage(page)
+      if (opts.url) await this.navigate(opts.url)
+      return this.ctx
+    } catch (err) {
+      await this.disconnect().catch(() => {})
+      throw err
+    }
+  }
 
+  /** Open the engine's CDP session on a page and wire the uid/stylesheet/script registries. */
+  private async initPage(page: Page): Promise<ToolContext> {
+    {
       const cdp = await page.createCDPSession()
       const uids = new UidRegistry()
       const sheets = new StylesheetRegistry()
@@ -309,6 +399,7 @@ export class SessionManager {
       await scripts.attach(cdp)
       await enableDebugger(cdp)
       await cdp.send('DOMSnapshot.enable')
+      await requestDocument(cdp)
       await cdp.send('Overlay.enable')
 
       // A page-side alert()/confirm()/prompt() blocks every evaluate-family CDP
@@ -316,7 +407,10 @@ export class SessionManager {
       // beforeunload is accepted (allows navigation to proceed).
       cdp.on('Page.javascriptDialogOpening', (ev: Protocol.Page.JavascriptDialogOpeningEvent) => {
         void cdp
-          .send('Page.handleJavaScriptDialog', { accept: ev.type === 'beforeunload' })
+          .send('Page.handleJavaScriptDialog', {
+            // In the user's own browser, never accept beforeunload: that would discard their unsaved work.
+            accept: ev.type === 'beforeunload' && this.mode !== 'extension',
+          })
           .catch(() => {})
         console.error(`[visionaire] auto-dismissed page dialog (${ev.type}): ${ev.message.slice(0, 80)}`)
       })
@@ -346,8 +440,68 @@ export class SessionManager {
         }
       })
 
-      this.ctx = { page, cdp, uids, sheets, scripts }
-      if (opts.url) await this.navigate(opts.url)
+      return { page, cdp, uids, sheets, scripts }
+    }
+  }
+
+  // ───────────────────────── extension bridge ─────────────────────────
+
+  private async connectExtension(opts: ConnectOptions): Promise<ToolContext | undefined> {
+    const bridge = this.bridge
+    if (!bridge || !bridge.listening) {
+      throw new Error(
+        `The extension bridge is not running${bridge?.startError ? ` (${bridge.startError})` : ''}. ` +
+          'It starts with the MCP server unless VISIONAIRE_BRIDGE=0; set VISIONAIRE_BRIDGE_PORT to move it.',
+      )
+    }
+    const client = await this.waitForPairedClient(bridge, opts.browser)
+    if (!client) throw new Error(extensionMissingHelp(bridge))
+
+    const { tabId, owned, needsNav } = await this.pickTab(client, opts)
+    this.mode = 'extension'
+
+    if (!client.caps.includes('cdp')) {
+      // Firefox: no DevTools Protocol for extensions — DOM/CSSOM collector instead.
+      this.liteSession = new LiteSession(client, tabId)
+      if (opts.url && needsNav) await this.liteSession.navigate(opts.url)
+      this.extensionTab = { client, tabId, owned }
+      return undefined
+    }
+
+    try {
+      const info = await client.request<AttachInfo>('cdp.attach', { tabId }).catch((err: Error) => {
+        if (/restricted by policy|host access/i.test(err.message)) {
+          throw new Error(
+            `${err.message} — this browser is managed by an organization policy that blocks extension debugging on this site ` +
+              '(Chrome 155+). Use mode "launch" (a separate local Chrome) instead.',
+          )
+        }
+        throw err
+      })
+      const transport = new ExtensionCdpTransport(client, tabId, info)
+      const browser = await puppeteer.connect({ transport, defaultViewport: null, protocolTimeout: 30_000 })
+      browser.on('disconnected', () => {
+        if (this.browser !== browser) return
+        const why = transport.detachReason
+        this.lostReason =
+          why === 'canceled_by_user'
+            ? 'the user clicked Cancel on Chrome\'s "started debugging this browser" bar'
+            : why === 'target_closed'
+              ? 'the inspected tab was closed'
+              : why?.startsWith('origin_not_approved:')
+                ? `the tab navigated to ${why.slice(20)}, which the user has not approved for the agent (the extension detached). ` +
+                  'Ask the user to allow that site when the extension prompts, or connect with a url on an approved site'
+                : why ?? 'the extension connection dropped'
+        this.ctx = undefined
+        this.browser = undefined
+        this.extensionTab = undefined
+      })
+      this.browser = browser
+      const page = (await browser.pages())[0]
+      if (!page) throw new Error('the extension attached but exposed no page target')
+      this.ctx = await this.initPage(page)
+      this.extensionTab = { client, tabId, owned }
+      if (opts.url && needsNav) await this.navigate(opts.url)
       return this.ctx
     } catch (err) {
       await this.disconnect().catch(() => {})
@@ -356,10 +510,66 @@ export class SessionManager {
   }
 
   /**
+   * A paired extension usually answers within a second. An unpaired one is connected
+   * but waiting (bridge.unpairedWaiting) — no point waiting, it needs a pairing code.
+   * Nothing at all may mean an MV3 worker asleep until its 30s alarm: wait longer.
+   */
+  private async waitForPairedClient(bridge: BridgeServer, prefer?: 'chrome' | 'firefox'): Promise<BridgeClient | undefined> {
+    const quick = await bridge.waitForClient(3_000, prefer)
+    if (quick || bridge.unpairedWaiting > 0) return quick
+    const deadline = Date.now() + EXTENSION_WAIT_MS
+    while (Date.now() < deadline) {
+      const c = await bridge.waitForClient(2_000, prefer)
+      if (c || bridge.unpairedWaiting > 0) return c
+    }
+    return undefined
+  }
+
+  private async pickTab(
+    client: BridgeClient,
+    opts: ConnectOptions,
+  ): Promise<{ tabId: number; owned: boolean; needsNav: boolean }> {
+    const tabs = await client.listTabs()
+    if (opts.tabId !== undefined) {
+      const t = tabs.find((x) => x.tabId === opts.tabId)
+      if (!t) throw new Error(`tab ${opts.tabId} is not shared with the agent (visible: ${tabs.map((x) => x.tabId).join(', ') || 'none'})`)
+      return { tabId: t.tabId, owned: t.owned, needsNav: true }
+    }
+    if (opts.url) {
+      // Reuse the agent's own tab rather than piling up a new one per connect.
+      const mine = tabs.filter((t) => t.owned)
+      const reuse = mine[mine.length - 1]
+      if (reuse) return { tabId: reuse.tabId, owned: true, needsNav: true }
+      const tab = await client.request<BridgeTab>('tabs.open', { url: opts.url })
+      // CDP clients open about:blank and navigate after attaching; lite clients load the url directly.
+      return { tabId: tab.tabId, owned: true, needsNav: client.caps.includes('cdp') }
+    }
+    const shared = tabs.filter((t) => t.shared)
+    const pick = shared.find((t) => t.active) ?? shared[shared.length - 1] ?? tabs[tabs.length - 1]
+    if (!pick) {
+      throw new Error(
+        `Connected to the ${client.label}, but no tab is shared with the agent. Either pass url (the extension ` +
+          'opens it in a new tab in the user\'s browser) or ask the user to click "Share this tab" in the Visionaire extension popup.',
+      )
+    }
+    return { tabId: pick.tabId, owned: pick.owned, needsNav: false }
+  }
+
+  /** Status of the extension bridge, for the connect tool's output. */
+  bridgeStatus(): string {
+    const b = this.bridge
+    if (!b) return 'extension bridge: disabled'
+    if (!b.listening) return `extension bridge: not listening (${b.startError ?? 'disabled'})`
+    const clients = b.clients()
+    return `extension bridge: ws://127.0.0.1:${b.port} — ${clients.length ? clients.map((c) => c.label).join(', ') : 'no extension connected'}`
+  }
+
+  /**
    * Disable the browser cache for the rest of the session — fresh CSS/JS on every
    * load (field report: a stale cached stylesheet survived normal navigations).
    */
   async disableCache(): Promise<void> {
+    if (this.liteSession) return // lite reloads pass bypassCache to tabs.reload instead
     const { cdp } = this.context()
     await cdp.send('Network.enable')
     await cdp.send('Network.setCacheDisabled', { cacheDisabled: true })
@@ -367,6 +577,7 @@ export class SessionManager {
 
   /** Reload the current page (optionally ignoring the cache), with the same registry resync as navigate(). */
   async reload(ignoreCache = false): Promise<void> {
+    if (this.liteSession) return this.liteSession.reload(ignoreCache)
     const { page, cdp } = this.context()
     if (ignoreCache) await this.disableCache()
     await page.reload({ waitUntil: 'load' })
@@ -374,9 +585,11 @@ export class SessionManager {
     await cdp.send('CSS.enable')
     await cdp.send('Debugger.disable')
     await enableDebugger(cdp)
+    await requestDocument(cdp)
   }
 
   async navigate(url: string): Promise<void> {
+    if (this.liteSession) return this.liteSession.navigate(url)
     const { page, cdp } = this.context()
     await page.goto(url, { waitUntil: 'load' })
     // Deterministic registry resync: the frameNavigated handler's fire-and-forget toggles
@@ -386,15 +599,31 @@ export class SessionManager {
     await cdp.send('CSS.enable')
     await cdp.send('Debugger.disable')
     await enableDebugger(cdp)
+    await requestDocument(cdp)
   }
 
   async setViewport(width: number, height: number, deviceScaleFactor?: number): Promise<void> {
+    if (this.liteSession) {
+      throw new Error(
+        'set_viewport needs the DevTools Protocol, which Firefox does not give extensions. Resize the browser window ' +
+          'manually, or use Chrome (full CDP) for responsive debugging.',
+      )
+    }
     const { page } = this.context()
     await page.setViewport({ width, height, deviceScaleFactor: deviceScaleFactor ?? 1 })
   }
 
   context(): ToolContext {
     if (!this.ctx) {
+      if (this.lostReason) {
+        throw new Error(`The extension session ended: ${this.lostReason}. Call connect again to resume.`)
+      }
+      if (this.liteSession) {
+        throw new Error(
+          'This step needs the DevTools Protocol, which Firefox does not give extensions (lite session). ' +
+            'Use the lite diagnostics solve offers here, or connect via Chrome for the full engine.',
+        )
+      }
       throw new Error(
         'Not connected to a browser. Call the "connect" tool first — mode "launch" starts a local Chrome; ' +
           'mode "attach" with browserUrl joins a running one.',
@@ -408,6 +637,8 @@ export class SessionManager {
     const ctx = this.ctx
     this.browser = undefined
     this.ctx = undefined
+    this.liteSession = undefined
+    this.extensionTab = undefined
 
     if (ctx) {
       ctx.uids.clear()
@@ -416,9 +647,29 @@ export class SessionManager {
       await ctx.cdp.detach().catch(() => {})
     }
     if (browser) {
-      // Launched browsers are ours to kill; attached ones belong to the user.
+      // Launched browsers are ours to kill; attached/extension ones belong to the user
+      // (extension: disconnect closes the transport, which detaches chrome.debugger).
       if (this.mode === 'launch') await browser.close().catch(() => {})
       else await browser.disconnect().catch(() => {})
     }
   }
+}
+
+function extensionMissingHelp(bridge: BridgeServer): string {
+  const { code, expiresInSec } = bridge.openPairing()
+  const waiting = bridge.unpairedWaiting > 0
+  return (
+    (waiting
+      ? 'The Visionaire extension is connected but not paired with this machine yet.\n'
+      : `No paired Visionaire extension connected to ws://127.0.0.1:${bridge.port}.\n`) +
+    `PAIRING CODE: ${code}   (one-time, valid ${Math.round(expiresInSec / 60)} min)\n` +
+    'Tell the user, exactly:\n' +
+    (waiting
+      ? ''
+      : '  • If the extension is not installed: run `npm run build:extension` in the visionaire-engine repo, then\n' +
+        '    Chrome/Edge/Brave: chrome://extensions → Developer mode → Load unpacked → extension/dist/chrome\n' +
+        '    Firefox: about:debugging#/runtime/this-firefox → Load Temporary Add-on → extension/dist/firefox/manifest.json\n') +
+    `  • Click the Visionaire toolbar icon, paste the code ${code} next to "${bridge.info.project}", press Pair.\n` +
+    'Then call connect again. (Alternatives: mode "launch" for a fresh local Chrome, or "attach" with browserUrl.)'
+  )
 }

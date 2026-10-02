@@ -76,9 +76,21 @@ export async function resolveTarget(ctx: ToolContext, target: TargetSpec): Promi
         `Unknown uid "${target.uid}" — it may be stale after navigation. Take a fresh page_snapshot.`,
       )
     }
-    const { nodeIds } = (await ctx.cdp.send('DOM.pushNodesByBackendIdsToFrontend', {
-      backendNodeIds: [entry.backendNodeId],
-    })) as Protocol.DOM.PushNodesByBackendIdsToFrontendResponse
+    const push = async (): Promise<Protocol.DOM.PushNodesByBackendIdsToFrontendResponse> =>
+      (await ctx.cdp.send('DOM.pushNodesByBackendIdsToFrontend', {
+        backendNodeIds: [entry.backendNodeId],
+      })) as Protocol.DOM.PushNodesByBackendIdsToFrontendResponse
+    let res: Protocol.DOM.PushNodesByBackendIdsToFrontendResponse
+    try {
+      res = await push()
+    } catch (err) {
+      // A uid minted via Runtime/DOMSnapshot (find_elements, solve's text lookup) can be the
+      // session's first DOM call — CDP refuses to push nodes until the document is requested.
+      if (!/Document needs to be requested first/i.test(String(err))) throw err
+      await ctx.cdp.send('DOM.getDocument', { depth: 0 })
+      res = await push()
+    }
+    const { nodeIds } = res
     const nodeId = nodeIds[0]
     if (!nodeId) {
       throw new Error(`uid "${target.uid}" no longer resolves to a live node. Take a fresh page_snapshot.`)

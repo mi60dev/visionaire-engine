@@ -30,10 +30,10 @@ case "$file_path" in
     mkdir -p .claude && touch .claude/.visionaire_pending
     if command -v jq >/dev/null 2>&1; then
       jq -cn --arg fp "$file_path" \
-        '{hookSpecificOutput:{hookEventName:"PostToolUse",additionalContext:("You edited a rendering file (" + $fp + "). Before claiming this works, run assert_visual (or the area suite) via the Visionaire MCP and report the measured verdict.")}}'
+        '{hookSpecificOutput:{hookEventName:"PostToolUse",additionalContext:("You edited a rendering file (" + $fp + "). Before claiming this works, run solve({tool: assert_visual}) (or the area suite) via the Visionaire MCP and report the measured verdict.")}}'
     else
       # No jq: the path cannot be safely JSON-escaped, so degrade to a plain reminder.
-      printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"You edited a rendering file. Before claiming this works, run assert_visual (or the area suite) via the Visionaire MCP and report the measured verdict."}}'
+      printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"You edited a rendering file. Before claiming this works, run solve({tool: assert_visual}) (or the area suite) via the Visionaire MCP and report the measured verdict."}}'
     fi
     ;;
 esac

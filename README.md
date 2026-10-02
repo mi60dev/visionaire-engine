@@ -8,7 +8,7 @@
 
 [![visionaire-engine MCP server](https://glama.ai/mcp/servers/mi60dev/visionaire-engine/badges/card.svg)](https://glama.ai/mcp/servers/mi60dev/visionaire-engine)
 
-![Visionaire Engine hero image](hero.png)
+![Visionaire Engine: your browser on the left with the Visionaire extension highlighting a button, your coding agent on the right getting the winning CSS rule with file:line and the rule it beat](hero.png)
 
 **The problem:** Something looks off. You screenshot it, explain it, the LLM guesses wrong, you re-explain.
 
@@ -18,11 +18,13 @@
 
 **You shouldn't have to write a paragraph to explain a 2px margin bug — and now you don't.** Less explaining, more fixing: built for developers, vibe coders, and anyone shipping site design changes with an LLM in the loop.
 
-**Status: v0.7** — 28 tools, 435 tests (252 unit + 183 end-to-end on real Chrome), a 24-case seeded-bug benchmark (`npm run bench`), verified live against wordpress.org.
+**Status: v1.1** — one `solve` gateway over 25 engine tools, a Chrome + Firefox extension for inspecting your own browser, 526 tests (unit + end-to-end on real Chrome and Firefox), a 24-case seeded-bug benchmark (`npm run bench`).
 
 <details>
 <summary><strong>What's new, by version</strong></summary>
 
+- **v1.1 — your own browser:** the Visionaire Bridge extension for Chrome-family browsers (full engine via `chrome.debugger`) and Firefox (lite engine via content scripts), paired once with a click; `connect { mode: "extension" }`; `solve` rebuilt — explicit `scenario`, expert `tool`+`args` mode, verdict-first answers with one `NEXT` step, asks with a uid outline instead of guessing
+- **v1.0 — single gateway:** `solve` replaces the 28-tool surface for agents
 - **v0.7 — the verification layer:** `assert_visual` (a 17-type assertion grammar — PASS/FAIL verdicts with measured pixels, offending uids, and re-runnable named suites), `visual_diff` (pixel diff vs a mockup or recorded baseline, divergent regions mapped to element uids), `impact_preview` (blast radius + sandboxed dry-run before editing a shared selector), `diagnose` (ranked "why is this broken" culprits with measured evidence), `responsive_sweep` (one call → per-viewport verdict matrix), `capture_proof` (before/after evidence bundles with a verdict delta); the verify-after-edit harness for Claude Code and Cursor (`npx visionaire-engine init-harness`); `style_diff { capture_pixels }` baselines; `check_alignment` deprecated in favor of `assert_visual`
 - **v0.6 — the pixel-perfect pack:** `check_alignment` (group alignment / gap-rhythm / grid / pixel-snap audit) and `pick_color` (actual painted-pixel sampling + WCAG contrast verdicts)
 - **v0.5:** `inject_css` — the live fix loop (trial a fix on the page, see what changed, converge, write source once); `navigate { bypassCache }` for stale-stylesheet hard reloads; blast-radius + scoped-fix reporting on `explain_styles` (change *the* button, not all buttons)
@@ -88,13 +90,39 @@ claude mcp add visionaire -- node "$PWD/dist/index.js"
 
 Using **GitHub Copilot, Cursor, Claude Desktop, Google Antigravity**, or another client? See **[docs/clients.md](docs/clients.md)** for a copy-paste config for each, plus browser-install help for Linux/WSL/Docker.
 
-**Run it from your project's root directory** — Visionaire is at its best when the agent has both the running site *and* its source on disk, so it can cross-reference the two. Ground before you search: take a `page_snapshot` (or read the source) to get real element names instead of guessing selectors. If a selector matches nothing, the error suggests the closest real ids/classes on the page.
+**Run it from your project's root directory** — Visionaire is at its best when the agent has both the running site *and* its source on disk, so it can cross-reference the two.
 
-Then, in a session:
+Then, in a session, the agent needs two tools:
 
-1. `connect { url: "https://your-site.com" }` — launches Chrome (or `{ browserUrl: "http://127.0.0.1:9222" }` to attach to your real, logged-in browser)
-2. `page_snapshot {}` — a uid-keyed census of what's visible; **target elements by their `uid`**, not invented selectors
-3. `explain_styles { uid: "e17", property: "margin-bottom" }` — cascade verdict with file:line
+1. `connect { url: "https://your-site.com" }` — launches Chrome. Or `{ mode: "extension", url }` to use **your own browser** via the extension (below).
+2. `solve { intent: "why is the hero CTA blue instead of white", context: { element: ".hero .btn" } }` — routes to a diagnostic plan, runs it, and answers verdict-first: the winning rule with file:line, why each rival lost, visibility/overlap causes, and one `NEXT:` step. `element` can be a uid, a selector, or visible text ("Subscribe button"). If it can't tell which element you mean, it returns a uid outline to pick from.
+
+Every engine tool below is reachable through `solve` in expert mode: `solve { intent, tool: "inject_css", args: { uid: "e17", declarations: { color: "#fff" } } }`. Force a plan with `scenario` (e.g. `"overlap-z-index"`). Full guide: [SOLVE_GUIDE.md](SOLVE_GUIDE.md).
+
+## Use your own browser (Chrome & Firefox extension)
+
+The **Visionaire Bridge** extension lets the MCP inspect pages in the browser you already use — logged-in dashboards, staging behind SSO, your real profile — with no `--remote-debugging-port` and no separate Chrome.
+
+```bash
+npm run build:extension        # → extension/dist/chrome and extension/dist/firefox
+```
+
+- **Chrome / Edge / Brave:** `chrome://extensions` → Developer mode → *Load unpacked* → `extension/dist/chrome`
+- **Firefox:** `about:debugging#/runtime/this-firefox` → *Load Temporary Add-on* → `extension/dist/firefox/manifest.json`
+
+The first `connect { mode: "extension" }` returns a one-time pairing code; paste it into the Visionaire popup (once). Then `connect { mode: "extension", url }` opens the page in an agent tab (grouped as "Visionaire"), or `connect { mode: "extension" }` inspects the tab you shared with **Share this tab**. `localhost` and `*.test` are pre-approved; any other site asks you first (Allow once / Always / Deny).
+
+| | Chrome-family (chrome.debugger) | Firefox (content scripts) |
+|---|---|---|
+| Engine | full — every tool | lite — declared limits |
+| Cascade winner + losers + file:line | ✓ (source-mapped) | ✓ (CSSOM + source fetch; no UA rules) |
+| Visibility / overlap / clipping / stacking | ✓ | ✓ |
+| Animations, snapshots, find, screenshots | ✓ | ✓ |
+| Listeners, interactions, viewport emulation, inject_css | ✓ | ✗ (no DevTools Protocol for Firefox extensions) |
+
+Windows + WSL works too (server in WSL, extension in your Windows browser) — see [WSL setup](extension/README.md#windows-with-wsl).
+
+The agent can only touch tabs it opened or you shared, on sites you approved; the bridge is loopback-only with `Host`/`Origin` pinning, a one-time-code pairing and port-bound mutual HMAC; cookie/storage protocol methods are blocked and `evaluate` is off in your browser. Threat model and details: [extension/README.md](extension/README.md).
 
 Try it without an MCP client:
 
@@ -103,13 +131,15 @@ npm run demo                                              # bundled fixture
 npm run demo -- https://wordpress.org --selector "a.wp-block-button__link"
 ```
 
-## The 28 tools
+## The engine tools (behind `solve`)
+
+`solve` routes plain-language problems to these; call any of them directly with `solve { intent, tool, args }`.
 
 **Session & grounding** — get connected and find the right element without guessing.
 
 | Tool | Purpose |
 |---|---|
-| `connect` / `navigate` / `set_viewport` | Launch or attach to Chrome, go to a URL (`bypassCache` for hard reloads), emulate viewports |
+| `connect` / `navigate` / `set_viewport` | Registered MCP tools: launch Chrome, attach, or use your browser via the extension; go to a URL (`bypassCache` for hard reloads); emulate viewports |
 | `page_snapshot` | Pruned, uid-keyed tree of what's visible — geometry, layout hints, invisibility reasons |
 | `page_origins` | Stylesheet inventory + platform detection (WordPress version, theme, builders, optimizers) |
 | `find_elements` | Deterministic search by text, selector, role, or screen region — AND-combined by default, `match:"any"` for a union, `visibleOnly:false` to include hidden elements |
@@ -228,13 +258,15 @@ Visionaire is pointed at arbitrary, untrusted pages, so it treats page content a
 
 - **Prompt-injection defense.** Page-derived strings (element text, class names, ids, attribute values) are sanitized at the single choke point where they enter tool output — collapsed to one line, stripped of control and bidirectional-override characters, and length-capped. A page cannot smuggle instruction-shaped text formatted as a "system message" toward the calling LLM; such content can only appear as an inert, quoted, truncated fragment.
 - **Fail-fast, never hang.** Every tool call is wrapped in a watchdog (default 60s, `VISIONAIRE_TOOL_TIMEOUT_MS` to override; `pick_element`/`record_interaction` get their declared wait plus slack). A wedged browser returns an actionable error telling you to `connect` again, instead of blocking the client.
-- **No dead-locking dialogs.** Page `alert()`/`confirm()`/`prompt()` calls are auto-dismissed — otherwise they would block every evaluate-family CDP call indefinitely.
+- **No dead-locking dialogs.** Page `alert()`/`confirm()`/`prompt()` calls are auto-dismissed — otherwise they would block every evaluate-family CDP call indefinitely. In your own browser (extension mode) `beforeunload` is never auto-accepted, so unsaved work is not discarded.
+- **Extension bridge.** Loopback-only WebSocket with `Host` (DNS rebinding) and `Origin` pinning; one-time-code pairing, the key never sent in the clear, port-bound mutual HMAC afterwards; per-site consent with auto-detach on navigation to an unapproved site; a DevTools-protocol allowlist (no cookies/storage/response bodies); `evaluate` and resource-loading CSS disabled in your browser. Full threat model: [extension/README.md](extension/README.md#security-model).
+- **Attach mode** accepts loopback DevTools endpoints only (`VISIONAIRE_ALLOW_REMOTE_ATTACH=1` to override).
 
 Visionaire never executes page-authored code as instructions; it only reads and attributes. The calling LLM should still treat tool output as data about a page, not as commands.
 
 ## Known limitations
 
-- Chromium-only (CDP is the only path to matched-rule source locations; `getMatchedCSSRules` was removed from browsers years ago).
+- The full engine is Chromium-only (CDP is the only path to matched-rule source locations). Firefox, via the extension, gets the lite engine: CSSOM cascade with line numbers recovered from the stylesheet source, no user-agent rules, no listeners or input emulation.
 - `@layer`: unlayered-vs-layered ordering is exact; ordering between two *different* layer chains is a deterministic proxy (CDP doesn't expose layer declaration order).
 - Some CDP fields we rely on (`specificity`, `layers`) are experimental; the engine feature-detects them and falls back (e.g. to its own specificity parser), and a contract smoke test in `test/e2e.test.ts` fails loudly if a Chrome update breaks the core protocol shape (the experimental fields are logged as present/absent).
 

@@ -1,7 +1,7 @@
 {
   "name": "visionaire-engine",
-  "version": "0.7.0",
-  "description": "Deterministic rendered-page \u2192 LLM context MCP server: which rule, which file, which line \u2014 and why it wins.",
+  "version": "1.1.0",
+  "description": "Deterministic rendered-page → LLM context MCP server: which rule, which file, which line — and why it wins.",
   "type": "module",
   "bin": {
     "visionaire-engine": "dist/index.js"
@@ -11,11 +11,13 @@
     "node": ">=20"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "rm -rf dist && tsc -p tsconfig.json",
     "dev": "tsx src/index.ts",
     "test": "vitest run",
     "bench": "tsx bench/run.ts",
-    "demo": "tsx scripts/demo.ts"
+    "demo": "tsx scripts/demo.ts",
+    "build:extension": "tsx scripts/build-extension.ts",
+    "prepack": "npm run build && npm run build:extension"
   },
   "keywords": [
     "mcp",
@@ -23,17 +25,22 @@
     "devtools",
     "debugging",
     "wordpress",
-    "llm"
+    "llm",
+    "browser-extension",
+    "chrome",
+    "firefox"
   ],
   "license": "Apache-2.0",
   "dependencies": {
     "@jridgewell/trace-mapping": "^0.3.31",
-    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@modelcontextprotocol/sdk": "^1.32.0",
     "puppeteer-core": "^24.43.1",
+    "ws": "^8.22.0",
     "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/node": "^26.1.0",
+    "@types/ws": "^8.18.2",
     "tsx": "^4.22.4",
     "typescript": "^6.0.3",
     "vitest": "^3.2.6"
@@ -44,7 +51,10 @@
     "harness/",
     "README.md",
     "LICENSE",
-    "NOTICE"
+    "NOTICE",
+    "extension/dist/",
+    "extension/README.md",
+    "!dist/**/*.map"
   ],
   "repository": {
     "type": "git",
