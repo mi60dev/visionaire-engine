@@ -15,6 +15,7 @@
  * page scroll offset added before they become a clip (same conversion the
  * region path already does). scale multiplies output pixel dimensions.
  */
+import { captureViewportShot } from '../engine/capture.js'
 import type { Protocol } from 'puppeteer-core'
 import { z } from 'zod'
 import type { TargetSpec, ToolContext, ToolDef } from '../types.js'
@@ -440,7 +441,12 @@ export const annotatedScreenshotTool: ToolDef = {
       } else if (a.fullPage) {
         params.captureBeyondViewport = true
       }
-      const shot = await ctx.cdp.send('Page.captureScreenshot', params)
+      // Plain viewport capture re-shoots with a viewport clip when the visible window is
+      // smaller than the emulated viewport (otherwise cropped right/bottom — field report).
+      const shot =
+        !plan && !a.region && !a.fullPage
+          ? await captureViewportShot(ctx, params)
+          : await ctx.cdp.send('Page.captureScreenshot', params)
 
       if (plan) {
         const r = plan.rect

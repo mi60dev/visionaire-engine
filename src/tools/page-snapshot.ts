@@ -16,6 +16,7 @@ import type {
 import { COMPUTED_WHITELIST } from '../types.js'
 import { resolveTarget } from '../uid.js'
 import { renderCensus } from '../format/census.js'
+import { cssBounds, deviceToCssScale } from '../engine/snapshot-scale.js'
 import { detectPlatformFromPage } from '../attribution/wordpress.js'
 
 const ELEMENT_NODE = 1
@@ -33,6 +34,7 @@ function snapshotToTree(
   strings: string[],
   viewport: Bounds,
   scopeBackendId?: number,
+  scale = 1,
 ): SnapshotNode {
   const nodes = doc.nodes
   const parentIndex = nodes.parentIndex ?? []
@@ -74,11 +76,8 @@ function snapshotToTree(
     return str(arr[i])
   }
 
-  const boundsOf = (row: number): Bounds | undefined => {
-    const r = layout.bounds[row]
-    if (!r || r.length < 4) return undefined
-    return { x: r[0]!, y: r[1]!, width: r[2]!, height: r[3]! }
-  }
+  // DOMSnapshot rects can be in device px (headful HiDPI) — normalise to CSS px.
+  const boundsOf = (row: number): Bounds | undefined => cssBounds(layout.bounds[row], scale)
 
   const attrsOf = (i: number): Map<string, string> => {
     const map = new Map<string, string>()
@@ -242,7 +241,7 @@ async function handler(ctx: ToolContext, args: Record<string, unknown>): Promise
     height: lv?.clientHeight ?? 0,
   }
 
-  const root = snapshotToTree(ctx, doc, snap.strings, viewport, scopeBackendId)
+  const root = snapshotToTree(ctx, doc, snap.strings, viewport, scopeBackendId, deviceToCssScale(metrics))
 
   const titleIdx = doc.title
   const page: PageMeta = {
