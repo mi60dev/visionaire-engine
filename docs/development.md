@@ -20,7 +20,7 @@ Do not bump these majors casually — each is held where it is on purpose
 | Dependency | Pinned major | Why |
 |---|---|---|
 | `puppeteer-core` | `^25.12.0` | 25 drops `extract-zip` (symlink path traversal, no patched release) and `basic-ftp` (ReDoS) from the tree; it needs Node ≥ 22.12, so Node 20 (end of life April 2026) was dropped. |
-| `vitest` (dev) | `^4.1.11` | 4.1.11 is the first fixed release for the `@vitest/mocker` redirect-mock file read (GHSA-82fw-gwwq-j7x9). |
+| `vitest` (dev) | `^5.0.3` | Fixed (≥ 4.1.11) for the `@vitest/mocker` redirect-mock file read (GHSA-82fw-gwwq-j7x9). |
 | `zod` | `^3.25.76` | `@modelcontextprotocol/sdk` (`^1.29.0`) expects zod v3 schemas. Tool `inputSchema`s are zod raw shapes handed to the SDK — zod 4 breaks that contract. |
 
 CDP protocol types come from `puppeteer-core` — there is no separate
