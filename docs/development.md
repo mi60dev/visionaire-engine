@@ -6,7 +6,7 @@ authoritative design reference, see [architecture.md](architecture.md).
 
 ## Prerequisites
 
-- **Node ≥ 20** (`engines` field in `package.json`).
+- **Node ≥ 22.12** (`engines` field in `package.json`).
 - **Chrome or Chromium installed.** The project depends on `puppeteer-core`,
   which does *not* download a browser. `findChromeExecutable()` in
   `src/session.ts` looks in `CHROME_PATH` first, then standard macOS / Windows /
@@ -19,8 +19,8 @@ Do not bump these majors casually — each is held where it is on purpose
 
 | Dependency | Pinned major | Why |
 |---|---|---|
-| `puppeteer-core` | `^24.43.1` | Newer majors raise the minimum Node version; 24 keeps Node 20.9 supported. |
-| `vitest` (dev) | `^3.2.6` | Same reason — vitest 4 raises the Node floor above 20.9. |
+| `puppeteer-core` | `^25.12.0` | 25 drops `extract-zip` (symlink path traversal, no patched release) and `basic-ftp` (ReDoS) from the tree; it needs Node ≥ 22.12, so Node 20 (end of life April 2026) was dropped. |
+| `vitest` (dev) | `^4.1.11` | 4.1.11 is the first fixed release for the `@vitest/mocker` redirect-mock file read (GHSA-82fw-gwwq-j7x9). |
 | `zod` | `^3.25.76` | `@modelcontextprotocol/sdk` (`^1.29.0`) expects zod v3 schemas. Tool `inputSchema`s are zod raw shapes handed to the SDK — zod 4 breaks that contract. |
 
 CDP protocol types come from `puppeteer-core` — there is no separate
@@ -32,7 +32,7 @@ CDP protocol types come from `puppeteer-core` — there is no separate
 git clone <repo> && cd visionaire-engine
 npm install
 npm run build     # tsc → dist/
-npm test          # 435 tests; the e2e part auto-skips without Chrome
+npm test          # 541 tests; the e2e part auto-skips without Chrome
 ```
 
 ## Commands

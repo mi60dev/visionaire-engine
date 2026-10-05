@@ -8,7 +8,7 @@
   },
   "main": "dist/index.js",
   "engines": {
-    "node": ">=20"
+    "node": ">=22.12"
   },
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.json",
@@ -34,7 +34,7 @@
   "dependencies": {
     "@jridgewell/trace-mapping": "^0.3.31",
     "@modelcontextprotocol/sdk": "^1.32.0",
-    "puppeteer-core": "^24.43.1",
+    "puppeteer-core": "^25.12.0",
     "ws": "^8.22.0",
     "zod": "^3.25.76"
   },
@@ -43,7 +43,7 @@
     "@types/ws": "^8.18.2",
     "tsx": "^4.22.4",
     "typescript": "^6.0.3",
-    "vitest": "^3.2.6"
+    "vitest": "^4.1.11"
   },
   "files": [
     "dist/",
