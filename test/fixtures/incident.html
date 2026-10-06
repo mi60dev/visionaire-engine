@@ -1,0 +1,34 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Incident fixture</title>
+<style>
+  body { font: 14px system-ui, sans-serif; margin: 20px; }
+  dialog { width: 400px; }
+  .dlg-body { height: 1400px; }
+</style>
+</head>
+<body>
+<!-- Field report 2026-10-06: an SPA route that renders after load, a long-text table,
+     and a dialog whose Cancel button sits below the viewport fold. -->
+<main id="app">Loading...</main>
+<button id="open">New report</button>
+<dialog id="dlg" aria-label="New report">
+  <h2>New report</h2>
+  <div class="dlg-body">Fields…</div>
+  <button id="cancel" onclick="document.getElementById('dlg').close()">Cancel</button>
+</dialog>
+<script>
+  document.getElementById('open').addEventListener('click', () => document.getElementById('dlg').showModal())
+  // Render the route 700 ms after load, like a SPA waiting on its data.
+  window.addEventListener('load', () => setTimeout(() => {
+    document.getElementById('app').innerHTML =
+      '<table id="data"><thead><tr><th>Watch</th><th>Comparison mode</th></tr></thead><tbody>' +
+      '<tr><td>Homepage hero banner above the fold on mobile Safari</td><td>Pixel difference with a 2 percent threshold</td></tr>' +
+      '<tr><td>Checkout summary panel</td><td>Layout shift only</td></tr>' +
+      '</tbody></table>'
+  }, 700))
+</script>
+</body>
+</html>

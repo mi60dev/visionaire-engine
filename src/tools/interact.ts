@@ -22,6 +22,7 @@ import { resolveTarget } from '../uid.js'
 import { getBoxSummary } from '../engine/box-model.js'
 import { assessVisibility } from '../engine/visibility.js'
 import { formatBounds } from '../format/dossier.js'
+import { describePageChange, readPageState } from '../engine/page-change.js'
 
 const OBJECT_GROUP = 'visionaire-interact'
 
@@ -66,6 +67,9 @@ async function targetCenter(
   ctx: ToolContext,
   node: ResolvedNode,
 ): Promise<{ x: number; y: number } | undefined> {
+  // Input events at coordinates outside the viewport hit nothing (field report 2026-10-06:
+  // a Cancel button below a dialog's fold was "clicked" with no effect) — scroll it in first.
+  await ctx.cdp.send('DOM.scrollIntoViewIfNeeded', { backendNodeId: node.backendNodeId }).catch(() => {})
   try {
     const { model } = await ctx.cdp.send('DOM.getBoxModel', { backendNodeId: node.backendNodeId })
     const q = model.content
@@ -145,7 +149,8 @@ export const interactTool: ToolDef = {
     'Perform ONE action (click/hover/focus) at a target and LEAVE the resulting state in place — ' +
     'no recording, no teardown. Use this to DRIVE the UI to a state (open a popup/menu/modal, reveal ' +
     'a tab) so you can then inspect_element / annotated_screenshot / explain_styles the new state. ' +
-    'Reports the target\'s post-action visibility + box so you learn immediately whether it opened. ' +
+    'Reports the target\'s post-action visibility + box AND what changed on the page (URL, dialogs opened/closed, ' +
+    'focus, elements added/removed, scroll) so you learn immediately whether it worked. ' +
     'Target by uid, selector, or x+y. (For the causal TIMELINE of an interaction — which handler ran, ' +
     'what mutated, transitions cancelled — use record_interaction instead.)',
   inputSchema,
@@ -156,6 +161,8 @@ export const interactTool: ToolDef = {
 
     const node = await resolveTarget(ctx, targetFromArgs(a)) // throws helpfully when the target is missing/stale
     const targetLabel = tagLabel(node.uid, ctx.uids.get(node.uid))
+
+    const pageBefore = await readPageState(ctx)
 
     // ── perform the action ──
     if (action === 'focus') {
@@ -224,6 +231,14 @@ export const interactTool: ToolDef = {
     }
     if (afterLabel !== targetLabel) {
       lines.push(`(the target re-resolved to ${afterLabel} after the action)`)
+    }
+    const pageAfter = await readPageState(ctx)
+    if (pageBefore && pageAfter) {
+      const changes = describePageChange(pageBefore, pageAfter)
+      lines.push(changes.length ? `page: ${changes.join('; ')}.` : 'page: no observable change (URL, dialogs, focus, element count, scroll all unchanged).')
+      if (pageAfter.dialogs.length) lines.push(`open dialogs now: ${pageAfter.dialogs.map((d) => `"${d}"`).join(', ')}`)
+    } else if (pageBefore && !pageAfter) {
+      lines.push('page: could not read the page after the action — it may be navigating.')
     }
     lines.push(
       'The page is now left in this new state. uids may have changed and new elements may have appeared — ' +

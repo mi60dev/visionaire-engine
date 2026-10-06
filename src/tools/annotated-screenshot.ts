@@ -15,7 +15,7 @@
  * page scroll offset added before they become a clip (same conversion the
  * region path already does). scale multiplies output pixel dimensions.
  */
-import { captureViewportShot } from '../engine/capture.js'
+import { captureFullPage, captureViewportShot } from '../engine/capture.js'
 import type { Protocol } from 'puppeteer-core'
 import { z } from 'zod'
 import type { TargetSpec, ToolContext, ToolDef } from '../types.js'
@@ -438,15 +438,17 @@ export const annotatedScreenshotTool: ToolDef = {
           scale: 1,
         }
         params.captureBeyondViewport = true
-      } else if (a.fullPage) {
-        params.captureBeyondViewport = true
       }
+      // Full page: budgeted (downscaled / JPEG) so a very long page still returns.
+      const full = !plan && !a.region && a.fullPage ? await captureFullPage(ctx) : undefined
       // Plain viewport capture re-shoots with a viewport clip when the visible window is
       // smaller than the emulated viewport (otherwise cropped right/bottom — field report).
-      const shot =
-        !plan && !a.region && !a.fullPage
+      const shot: { data: string } = full
+        ? full
+        : !plan && !a.region && !a.fullPage
           ? await captureViewportShot(ctx, params)
           : await ctx.cdp.send('Page.captureScreenshot', params)
+      const mimeType = full?.mimeType ?? 'image/png'
 
       if (plan) {
         const r = plan.rect
@@ -480,9 +482,10 @@ export const annotatedScreenshotTool: ToolDef = {
         lines.push('no markable elements found — screenshot has no marks')
       }
       if (skipped.length > 0) lines.push(`skipped: ${skipped.join(', ')}`)
+      if (full?.note) lines.push(`note: ${full.note} — mark coordinates above are document CSS px; image px = CSS px × ${full.scale}`)
       lines.push(...precedenceNotes)
 
-      return { text: lines.join('\n'), images: [{ data: shot.data, mimeType: 'image/png' }] }
+      return { text: lines.join('\n'), images: [{ data: shot.data, mimeType }] }
     } finally {
       // Mark discovery allocates in OBJECT_GROUP and (on the annotated path) injects the
       // overlay — always tear both down when we drew marks, even if capture threw partway.

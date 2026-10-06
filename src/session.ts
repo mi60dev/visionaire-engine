@@ -7,6 +7,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import puppeteer from 'puppeteer-core'
+import { settlePage, type SettleResult } from './settle.js'
 import type { Browser, CDPSession, LaunchOptions, Page, Protocol } from 'puppeteer-core'
 import { ScriptRegistry } from './attribution/scripts.js'
 import { ExtensionCdpTransport, type AttachInfo } from './bridge/cdp-transport.js'
@@ -270,6 +271,12 @@ export interface ConnectOptions {
 /** How long connect({mode:'extension'}) waits for the extension to dial in (MV3 workers wake on a 30s alarm). */
 const EXTENSION_WAIT_MS = Math.max(1_000, Number(process.env['VISIONAIRE_EXTENSION_WAIT_MS']) || 35_000)
 
+/** How navigate/reload wait after `load`: settle cap and/or a selector to wait for. */
+export interface SettleOptions {
+  timeoutMs?: number
+  selector?: string
+}
+
 export class SessionManager {
   private browser?: Browser
   private ctx?: ToolContext
@@ -280,8 +287,45 @@ export class SessionManager {
   private extensionTab?: { client: BridgeClient; tabId: number; owned: boolean }
   /** Set when an extension session ended underneath us (user cancelled the debug bar, tab closed…). */
   private lostReason?: string
+  /** True once connect() was called in this process — auto-resume only covers a fresh (restarted) server. */
+  private everConnected = false
 
   constructor(readonly bridge?: BridgeServer) {}
+
+  /**
+   * A restarted MCP server holds no browser session, yet the user's paired extension redials it within
+   * seconds (field report 2026-10-06: the client restarted the server mid-task; the next call failed with
+   * "Not connected"). When nothing was ever connected in this process and a paired CDP extension is already
+   * connected, reattach to the agent's own tab (else the shared active tab) and say so.
+   * Returns a note for the tool output, or undefined when nothing was resumed.
+   */
+  async autoResume(): Promise<string | undefined> {
+    // Concurrent first calls share one attempt rather than racing two connects.
+    this.resuming ??= this.tryResume().finally(() => {
+      this.resuming = undefined
+    })
+    return this.resuming
+  }
+
+  private resuming?: Promise<string | undefined>
+
+  private async tryResume(): Promise<string | undefined> {
+    if (this.ctx || this.liteSession || this.everConnected) return undefined
+    const bridge = this.bridge
+    if (!bridge?.listening) return undefined
+    const client = await bridge.waitForClient(1_500)
+    if (!client || !client.caps.includes('cdp')) return undefined
+    const tabs = await client.listTabs().catch(() => [])
+    const owned = tabs.filter((t) => t.owned)
+    const shared = tabs.filter((t) => t.shared)
+    const pick = owned[owned.length - 1] ?? shared.find((t) => t.active) ?? shared[shared.length - 1]
+    if (!pick) return undefined
+    await this.connect({ mode: 'extension', tabId: pick.tabId })
+    return (
+      `note: no browser session in this server process (it was restarted) — reattached automatically to the paired ` +
+      `${client.label}, tab ${pick.tabId}${pick.title ? ` "${pick.title.slice(0, 60)}"` : ''}. Earlier uids are stale.`
+    )
+  }
 
   get currentMode(): SessionMode {
     return this.mode
@@ -310,6 +354,7 @@ export class SessionManager {
   async connect(opts: ConnectOptions = {}): Promise<ToolContext | undefined> {
     await this.disconnect()
     this.lostReason = undefined
+    this.everConnected = true
 
     if (opts.mode === 'extension') return this.connectExtension(opts)
 
@@ -576,22 +621,32 @@ export class SessionManager {
   }
 
   /** Reload the current page (optionally ignoring the cache), with the same registry resync as navigate(). */
-  async reload(ignoreCache = false): Promise<void> {
-    if (this.liteSession) return this.liteSession.reload(ignoreCache)
+  async reload(ignoreCache = false, settle: SettleOptions = {}): Promise<SettleResult | undefined> {
+    if (this.liteSession) {
+      await this.liteSession.reload(ignoreCache)
+      return undefined
+    }
     const { page, cdp } = this.context()
     if (ignoreCache) await this.disableCache()
     await page.reload({ waitUntil: 'load' })
+    const settled = await settlePage(page, settle)
     await cdp.send('CSS.disable')
     await cdp.send('CSS.enable')
     await cdp.send('Debugger.disable')
     await enableDebugger(cdp)
     await requestDocument(cdp)
+    return settled
   }
 
-  async navigate(url: string): Promise<void> {
-    if (this.liteSession) return this.liteSession.navigate(url)
+  /** Load url, then wait for the page to settle (SPA routes render after `load`) — see settle.ts. */
+  async navigate(url: string, settle: SettleOptions = {}): Promise<SettleResult | undefined> {
+    if (this.liteSession) {
+      await this.liteSession.navigate(url)
+      return undefined
+    }
     const { page, cdp } = this.context()
     await page.goto(url, { waitUntil: 'load' })
+    const settled = await settlePage(page, settle)
     // Deterministic registry resync: the frameNavigated handler's fire-and-forget toggles
     // may still be in flight when goto resolves; awaited toggles here guarantee both
     // registries are fully populated before any tool call that follows a navigate.
@@ -600,6 +655,7 @@ export class SessionManager {
     await cdp.send('Debugger.disable')
     await enableDebugger(cdp)
     await requestDocument(cdp)
+    return settled
   }
 
   async setViewport(width: number, height: number, deviceScaleFactor?: number): Promise<void> {

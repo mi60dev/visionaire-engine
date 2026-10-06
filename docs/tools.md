@@ -44,11 +44,16 @@ url: file:///…/test/fixtures/cascade.html
 
 ## navigate
 
-Load a URL in the connected tab (waits for the `load` event). All uids from earlier snapshots become stale, and the stylesheet registry is rebuilt for the new document.
+Load a URL in the connected tab, wait for the `load` event, then wait for the page to **settle**: network idle for 500 ms AND no DOM mutation for 400 ms AND no visible loading indicator (`aria-busy`, a progressbar, or a short "Loading…"/"Please wait" text) — single-page apps render their route after `load`. The output ends with a `settle:` line saying how long it waited, or that the page was still busy at the cap. With no `url` it reloads. All uids from earlier snapshots become stale, and the stylesheet registry is rebuilt for the new document.
+
+If this server process was restarted and has no session while a paired extension is connected, `navigate`, `set_viewport` and `solve` reattach to the agent's own tab (else the shared active tab) automatically and say so in a leading `note:` line.
 
 | Parameter | Type | Default | Meaning |
 |---|---|---|---|
-| `url` | string | required | Absolute URL to load |
+| `url` | string | — | Absolute URL to load; omit to reload |
+| `bypassCache` | boolean | false | Disable the browser cache for the rest of the session |
+| `waitFor` | string | — | CSS selector of content you expect; wait until it exists instead of the generic settle |
+| `settleMs` | number | 8000 | Cap on the settle wait (max 30000; 0 = return right after `load`) |
 
 **Output:**
 
@@ -386,7 +391,7 @@ A screenshot with numbered marks burned in — the bridge between pixels and uid
 |---|---|---|---|
 | `uids` | string[] | top ~25 interactive/landmark elements | Uids to mark; unknown/detached uids are skipped and listed |
 | `region` | `{x, y, width > 0, height > 0}` | — | Clip to this viewport rectangle (CSS px). Mutually exclusive with `fullPage` |
-| `fullPage` | boolean | `false` | Capture the whole document, beyond the viewport |
+| `fullPage` | boolean | `false` | Capture the whole document, beyond the viewport — downscaled to fit 7,800 px a side and 12 MP, re-encoded as JPEG if the PNG is still over ~3.4 MB; the output says when it did |
 | `clipTo` | `{uid \| selector \| x,y}` | — | **Element-scoped crop**: clip the shot to one element's border box. Target by uid, selector, or a viewport point |
 | `padding` | number | `0` | `clipTo` only: extra pixels of margin around the cropped element on every side |
 | `scale` | number 0.5–4 | `1` | `clipTo` only: zoom factor for the crop (2 = double size) — enlarge a tiny element like an `×` so you can actually see it |
@@ -403,7 +408,7 @@ marks:
   5=e5 <a.btn> "Get started" @(40,142)
 ```
 
-Legend coordinates are viewport coordinates for viewport/region captures and document coordinates for `fullPage` (matching the image pixels). Stale uids append a `skipped: e42 (unknown uid — take a fresh page_snapshot)` line rather than failing the whole call.
+Legend coordinates are viewport coordinates for viewport/region captures and document coordinates for `fullPage` (matching the image pixels at full size; a downscaled capture prints the factor: image px = CSS px × scale). Stale uids append a `skipped: e42 (unknown uid — take a fresh page_snapshot)` line rather than failing the whole call.
 
 ## style_diff
 
@@ -571,7 +576,7 @@ Honesty notes are part of the format: CDP DOM events carry no timestamps, so `t=
 
 ## interact
 
-Drive the UI into a state and **leave it there**. `interact` performs exactly one action at the target — click, hover, or focus — and does *not* record, tear anything down, or revert: a popup opened here stays open, so you can then `page_snapshot` / `inspect_element` / `annotated_screenshot` / `explain_styles` the resulting state. It reports the target's post-action visibility and content box so you learn immediately whether the action opened what you expected.
+Drive the UI into a state and **leave it there**. `interact` performs exactly one action at the target — click, hover, or focus — and does *not* record, tear anything down, or revert: a popup opened here stays open, so you can then `page_snapshot` / `inspect_element` / `annotated_screenshot` / `explain_styles` the resulting state. It reports the target's post-action visibility and content box, then a `page:` line with what changed on the page — URL or title, dialogs opened/closed (by label), focus, elements added/removed, scroll — and the dialogs still open, so you learn immediately whether the action worked. The target is scrolled into view (including inside a scrollable dialog) before a click or hover, since input outside the viewport hits nothing.
 
 This is the sibling of `record_interaction`: `record_interaction` opens the Animation/Debugger/mutation channels, captures a causal *timeline*, and tears every channel back down (often returning the page to its pre-interaction state); `interact` does the minimum and leaves you *in* the new state. Reach for `interact` to get somewhere ("open the menu, then tell me why it overflows"); reach for `record_interaction` to explain the transition itself.
 
@@ -589,6 +594,15 @@ The page is now left in this new state. uids may have changed and new elements m
 ```
 
 The reported box is the **content box** (matching `inspect_element` / `measure_element`). After the settle wait, `interact` re-resolves the same target (a fresh `backendNodeId` if the DOM swapped the node) and reports its post-action state, falling back to the original node if the target vanished (e.g. a close button that removes itself). If the target has no clickable geometry (`display:none`, zero-size, detached), it errors and tells you to make it visible first.
+
+## read_text
+
+Read the **full** visible text of an element (`uid` | `selector` | `x`+`y`), or of the whole page when no target is given. Uses `innerText`, so hidden text is excluded, table rows come back one per line with tab-separated cells, and whitespace is normalised. Other tools shorten element text to a few dozen characters; use this to read content (tables, lists, messages) instead of screenshots. Output is wrapped in `---` lines and labelled as page data, not instructions; truncation is always marked with the number of characters left out.
+
+| Parameter | Type | Default | Meaning |
+|---|---|---|---|
+| `uid` / `selector` / `x`+`y` | — | page | Element to read; omit for `document.body` |
+| `maxChars` | number | 4000 | Character budget (50–20000) |
 
 ## measure_element
 

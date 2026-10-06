@@ -42,6 +42,8 @@ import { responsiveSweepTool } from './responsive-sweep.js'
 import { captureProofTool } from './capture-proof.js'
 import { checkAlignmentTool } from './check-alignment.js'
 import { pickColorTool } from './pick-color.js'
+import { describeShape, schemaAt } from '../format/schema-shape.js'
+import { readTextTool } from './read-text.js'
 
 /** Engine tools reachable through solve. */
 export const TOOL_HANDLERS: Record<string, ToolDef> = Object.fromEntries(
@@ -50,7 +52,7 @@ export const TOOL_HANDLERS: Record<string, ToolDef> = Object.fromEntries(
     findElementsTool, nodeAtPointTool, annotatedScreenshotTool, styleDiffTool, pickElementTool,
     getListenersTool, explainAnimationsTool, recordInteractionTool, interactTool, measureElementTool,
     evaluateTool, injectCssTool, assertVisualTool, visualDiffTool, impactPreviewTool, diagnoseTool,
-    responsiveSweepTool, captureProofTool, checkAlignmentTool, pickColorTool,
+    responsiveSweepTool, captureProofTool, checkAlignmentTool, pickColorTool, readTextTool,
   ].map((t) => [t.name, t]),
 )
 const TOOL_NAMES = Object.keys(TOOL_HANDLERS) as [string, ...string[]]
@@ -301,7 +303,14 @@ async function runDirect(ctx: ToolContext, name: string, args: Record<string, un
   if (!check.success) {
     return {
       text:
-        `Invalid args for ${name}: ${check.error.issues.map((i) => `${i.path.join('.') || 'args'}: ${i.message}`).join('; ')}\n` +
+        `Invalid args for ${name}: ${check.error.issues
+          .map((i) => {
+            const at = i.path.join('.') || 'args'
+            // Show the expected shape, not just "expected object" (field report: scope).
+            const sub = i.path.length ? schemaAt(def.inputSchema, i.path) : undefined
+            return `${at}: ${i.message}${sub && i.code === 'invalid_type' ? ` — expected ${at}: ${describeShape(sub)}` : ''}`
+          })
+          .join('; ')}\n` +
         `${name} accepts: ${Object.keys(def.inputSchema).join(', ')}\n${def.description}`,
     }
   }
