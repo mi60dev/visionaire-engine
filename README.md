@@ -163,6 +163,7 @@ npm run demo -- https://wordpress.org --selector "a.wp-block-button__link"
 | `measure_element` | Sub-pixel rendered geometry: content box + true text-ink box (glyph extents) with a centering verdict — "is this × actually centered?" |
 | `check_alignment` | *(deprecated → `assert_visual`)* Group pixel audit: which of N elements is off-alignment by how many px, gap-rhythm outliers, size consistency, N-px grid conformance, pixel-snap warnings |
 | `pick_color` | The actual painted pixel (composited truth: gradients, images, opacity) + computed colors + WCAG AA/AAA contrast verdict |
+| `read_text` | The full visible text of an element or the page (tables as tab-separated rows), budgeted, truncation marked |
 
 **Interaction & time** — states, not just snapshots.
 

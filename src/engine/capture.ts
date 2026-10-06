@@ -88,3 +88,59 @@ export async function captureViewportShot(
 export async function captureViewport(ctx: ToolContext): Promise<string> {
   return (await captureViewportShot(ctx)).data
 }
+
+/**
+ * Full-page budget (field report 2026-10-06: a 28,000 px page produced a 22 MB PNG the
+ * client refused). Image clients reject very tall images and large payloads, so a
+ * full-page capture is downscaled to fit, and re-encoded as JPEG if still too heavy.
+ */
+export const FULL_PAGE_MAX_SIDE = 7_800
+export const FULL_PAGE_MAX_PIXELS = 12_000_000
+export const SHOT_MAX_BASE64 = 4_500_000
+
+/** Pure: the CSS→image scale that fits a w×h CSS-px page into the budget (≤ 1). */
+export function fullPageScale(width: number, height: number): number {
+  if (width <= 0 || height <= 0) return 1
+  const s = Math.min(1, FULL_PAGE_MAX_SIDE / width, FULL_PAGE_MAX_SIDE / height, Math.sqrt(FULL_PAGE_MAX_PIXELS / (width * height)))
+  return Math.floor(s * 1000) / 1000
+}
+
+export interface FullPageShot {
+  data: string
+  mimeType: 'image/png' | 'image/jpeg'
+  /** Image px per document CSS px (1 = full size). */
+  scale: number
+  cssWidth: number
+  cssHeight: number
+  note?: string
+}
+
+export async function captureFullPage(ctx: ToolContext): Promise<FullPageShot> {
+  const m = await ctx.cdp.send('Page.getLayoutMetrics')
+  const cssWidth = Math.ceil(m.cssContentSize?.width ?? m.contentSize.width)
+  const cssHeight = Math.ceil(m.cssContentSize?.height ?? m.contentSize.height)
+  const scale = fullPageScale(cssWidth, cssHeight)
+  // clip.scale is applied on top of the device ratio — divide it out so `scale` is image px per CSS px.
+  const clip = { x: 0, y: 0, width: cssWidth, height: cssHeight, scale: scale / deviceToCssScale(m) }
+  const notes: string[] = []
+  if (scale < 1) {
+    notes.push(
+      `full page is ${cssWidth}x${cssHeight} CSS px — image downscaled to ${scale}x ` +
+        `(${Math.round(cssWidth * scale)}x${Math.round(cssHeight * scale)}) to stay returnable; use region or clipTo for detail`,
+    )
+  }
+  let shot = await ctx.cdp.send('Page.captureScreenshot', { format: 'png', clip, captureBeyondViewport: true })
+  let mimeType: FullPageShot['mimeType'] = 'image/png'
+  if (shot.data.length > SHOT_MAX_BASE64) {
+    shot = await ctx.cdp.send('Page.captureScreenshot', { format: 'jpeg', quality: 70, clip, captureBeyondViewport: true })
+    mimeType = 'image/jpeg'
+    notes.push('PNG was too large to return — re-encoded as JPEG (quality 70)')
+  }
+  if (shot.data.length > SHOT_MAX_BASE64) {
+    throw new Error(
+      `full-page screenshot is still ${Math.round((shot.data.length * 3) / 4 / 1_000_000)} MB after downscaling and JPEG — ` +
+        'too large to return. Capture a region (viewport coords) or clipTo an element instead.',
+    )
+  }
+  return { data: shot.data, mimeType, scale, cssWidth, cssHeight, note: notes.length ? notes.join('; ') : undefined }
+}

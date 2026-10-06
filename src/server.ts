@@ -13,6 +13,7 @@ import { z } from 'zod'
 import type { SessionManager } from './session.js'
 import type { ToolResult } from './types.js'
 import { solveTool } from './tools/solve.js'
+import { DEFAULT_SETTLE_MS, MAX_SETTLE_MS } from './settle.js'
 
 function ok(text: string): CallToolResult {
   return { content: [{ type: 'text', text }] }
@@ -80,7 +81,7 @@ const SERVER_INSTRUCTIONS = [
   '     text. solve routes, runs the plan and leads with the answer + one NEXT step. If it asks for an',
   '     element it returns a page outline with uids — use one. Pass `scenario` to force a plan.',
   '  3. Expert mode: solve({intent, tool, args}) runs one engine tool directly (page_snapshot,',
-  '     explain_styles, inject_css, measure_element, get_listeners, record_interaction, assert_visual, …).',
+  '     explain_styles, inject_css, measure_element, read_text, get_listeners, record_interaction, assert_visual, …).',
   '',
   'To TEST a fix, do not edit files and reload: solve({tool:"inject_css", args:{uid, declarations}}) applies it',
   'live (revertable); verify with measure_element / style_diff, converge, THEN write it into the source once.',
@@ -164,19 +165,31 @@ export function createServer(session: SessionManager): McpServer {
           .boolean()
           .optional()
           .describe('Disable the browser cache for the rest of the session (fresh CSS/JS on every load)'),
+        waitFor: z
+          .string()
+          .optional()
+          .describe('CSS selector of content you expect (e.g. "table tbody tr"): wait until it exists before returning — best for single-page apps'),
+        settleMs: z
+          .number()
+          .optional()
+          .describe(`After load, wait up to this long for network + DOM to go quiet (default ${DEFAULT_SETTLE_MS}, max ${MAX_SETTLE_MS}, 0 = no wait)`),
       },
     },
     async (args): Promise<CallToolResult> => {
       try {
-        await withWatchdog('navigate', async () => {
+        const resumed = await session.autoResume().catch(() => undefined)
+        const settleOpts = { timeoutMs: args.settleMs, selector: args.waitFor }
+        const settled = await withWatchdog('navigate', async () => {
           if (args.bypassCache) await session.disableCache()
-          if (args.url) await session.navigate(args.url)
-          else await session.reload(args.bypassCache === true)
+          if (args.url) return session.navigate(args.url, settleOpts)
+          return session.reload(args.bypassCache === true, settleOpts)
         })
         const cacheNote = args.bypassCache ? ' (browser cache disabled for this session)' : ''
         const url = session.lite ? await session.lite.url() : session.context().page.url()
         return ok(
-          `${args.url ? 'navigated to' : 'reloaded'} ${url}${cacheNote} — previous uids are stale; re-run solve (or scenario "page-overview") for fresh uids.`,
+          (resumed ? `${resumed}\n` : '') +
+            `${args.url ? 'navigated to' : 'reloaded'} ${url}${cacheNote} — previous uids are stale; re-run solve (or scenario "page-overview") for fresh uids.` +
+            (settled ? `\n${settled.note}` : ''),
         )
       } catch (err) {
         return errorResult(err)
@@ -197,9 +210,11 @@ export function createServer(session: SessionManager): McpServer {
     },
     async (args): Promise<CallToolResult> => {
       try {
+        const resumed = await session.autoResume().catch(() => undefined)
         await withWatchdog('set_viewport', () => session.setViewport(args.width, args.height, args.deviceScaleFactor))
         return ok(
-          `viewport set to ${args.width}x${args.height}@${args.deviceScaleFactor ?? 1}x — re-run solve; @media winners may differ at this size.`,
+          (resumed ? `${resumed}\n` : '') +
+            `viewport set to ${args.width}x${args.height}@${args.deviceScaleFactor ?? 1}x — re-run solve; @media winners may differ at this size.`,
         )
       } catch (err) {
         return errorResult(err)
@@ -218,8 +233,9 @@ export function createServer(session: SessionManager): McpServer {
     async (args: Record<string, unknown>): Promise<CallToolResult> => {
       try {
         // solve resolves its own context (CDP or lite); the ctx argument is unused.
+        const resumed = await session.autoResume().catch(() => undefined)
         const result = await withWatchdog('solve', () => solveDef.handler(undefined as never, args ?? {}), SOLVE_TIMEOUT_MS)
-        return toCallToolResult(result)
+        return toCallToolResult(resumed ? { ...result, text: `${resumed}\n${result.text}` } : result)
       } catch (err) {
         return errorResult(err)
       }
