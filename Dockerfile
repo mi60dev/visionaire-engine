@@ -1,4 +1,4 @@
-FROM node:20-alpine
+FROM node:22-alpine
 
 # Install Chrome/Chromium (required for puppeteer-core)
 RUN apk add --no-cache chromium

@@ -6,6 +6,8 @@
 [![CI](https://github.com/mi60dev/visionaire-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/mi60dev/visionaire-engine/actions/workflows/ci.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
+[![Listed on MCP ServerList](https://img.shields.io/badge/Listed%20on-MCP%20ServerList-black?style=flat-square&logo=anthropic)](https://mcp-serverlist.com)
+
 [![visionaire-engine MCP server](https://glama.ai/mcp/servers/mi60dev/visionaire-engine/badges/card.svg)](https://glama.ai/mcp/servers/mi60dev/visionaire-engine)
 
 ![Visionaire Engine: your browser on the left with the Visionaire extension highlighting a button, your coding agent on the right getting the winning CSS rule with file:line and the rule it beat](hero.png)
@@ -18,11 +20,12 @@
 
 **You shouldn't have to write a paragraph to explain a 2px margin bug — and now you don't.** Less explaining, more fixing: built for developers, vibe coders, and anyone shipping site design changes with an LLM in the loop.
 
-**Status: v1.1** — one `solve` gateway over 25 engine tools, a Chrome + Firefox extension for inspecting your own browser, 526 tests (unit + end-to-end on real Chrome and Firefox), a 24-case seeded-bug benchmark (`npm run bench`).
+**Status: v1.2** — one `solve` gateway over 26 engine tools, a Chrome + Firefox extension for inspecting your own browser, 562 tests (unit + end-to-end on real Chrome and Firefox), a 24-case seeded-bug benchmark (`npm run bench`).
 
 <details>
 <summary><strong>What's new, by version</strong></summary>
 
+- **v1.2 — field-hardened:** a restarted server reattaches to an already-paired extension instead of losing the session; `navigate` waits for SPA routes to settle (network idle, DOM quiet, no loading spinner; `waitFor` / `settleMs`); `read_text` returns an element's full text (tables as rows) within a budget; full-page screenshots downscale to fit client limits; `interact` scrolls the target into view and reports what changed (URL, dialogs opened/closed, focus, elements added/removed); argument errors show the expected shape
 - **v1.1 — your own browser:** the Visionaire Bridge extension for Chrome-family browsers (full engine via `chrome.debugger`) and Firefox (lite engine via content scripts), paired once with a click; `connect { mode: "extension" }`; `solve` rebuilt — explicit `scenario`, expert `tool`+`args` mode, verdict-first answers with one `NEXT` step, asks with a uid outline instead of guessing
 - **v1.0 — single gateway:** `solve` replaces the 28-tool surface for agents
 - **v0.7 — the verification layer:** `assert_visual` (a 17-type assertion grammar — PASS/FAIL verdicts with measured pixels, offending uids, and re-runnable named suites), `visual_diff` (pixel diff vs a mockup or recorded baseline, divergent regions mapped to element uids), `impact_preview` (blast radius + sandboxed dry-run before editing a shared selector), `diagnose` (ranked "why is this broken" culprits with measured evidence), `responsive_sweep` (one call → per-viewport verdict matrix), `capture_proof` (before/after evidence bundles with a verdict delta); the verify-after-edit harness for Claude Code and Cursor (`npx visionaire-engine init-harness`); `style_diff { capture_pixels }` baselines; `check_alignment` deprecated in favor of `assert_visual`
@@ -72,7 +75,7 @@ Winner, losers with the decisive loss reason, and an honest edit pointer for eac
 
 ## Quick start
 
-Requires Node ≥ 20 and Chrome/Chromium installed.
+Requires Node ≥ 22.12 and Chrome/Chromium installed.
 
 Fastest path — register straight from npm with Claude Code (no clone, no build):
 

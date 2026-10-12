@@ -18,3 +18,8 @@ launch/
 
 # local agent/IDE state — never publish (contains machine paths)
 .claude/
+
+# Local research output (may reference private projects) — never commit
+reports/
+research_notes/
+.mcp.json

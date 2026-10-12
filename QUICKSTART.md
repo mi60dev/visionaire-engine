@@ -62,7 +62,7 @@ npm test         # Run tests
 
 ## Docker Image Details
 
-- **Base:** Node 20 Alpine (~150MB)
+- **Base:** Node 22 Alpine (~150MB)
 - **Chrome:** Added via apk (~100MB)
 - **Final size:** ~360MB
 - **Fully offline:** No external dependencies
